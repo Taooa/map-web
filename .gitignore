@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.vite/
+.DS_Store
+*.local
+*.log
+.env
+.env.*
+!.env.example
+reference/
