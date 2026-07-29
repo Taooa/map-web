@@ -1,11 +1,13 @@
-import { PagePlaceholder } from '@/components/PagePlaceholder';
+import { MapPrototypePage } from '@/components/MapPrototypePage';
 
 export function AMapPage() {
   return (
-    <PagePlaceholder
-      eyebrow="地图页面空壳"
+    <MapPrototypePage
+      coordinateSystem="GCJ02"
+      credentialName="Key"
+      shortName="AM"
       title="高德地图"
-      description="高德地图 SDK、Marker 和 API Key 配置将在后续地图阶段接入。"
+      tone="amber"
     />
   );
 }

@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { appNavigation } from '@/config/routes';
+import { ToolIcon } from '@/components/ToolIcon';
 
 export function AppLayout() {
   return (
@@ -7,9 +8,12 @@ export function AppLayout() {
       <header className="app-header">
         <NavLink className="app-brand" to="/" aria-label="Coordinate Toolkit 首页">
           <span className="app-brand__mark" aria-hidden="true">
-            CT
+            <ToolIcon name="target" size={20} />
           </span>
-          <span>Coordinate Toolkit</span>
+          <span className="app-brand__text">
+            Coordinate Toolkit
+            <small>by PeachTools</small>
+          </span>
         </NavLink>
 
         <nav className="app-navigation" aria-label="主导航">

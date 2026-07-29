@@ -1,11 +1,13 @@
-import { PagePlaceholder } from '@/components/PagePlaceholder';
+import { MapPrototypePage } from '@/components/MapPrototypePage';
 
 export function BaiduMapPage() {
   return (
-    <PagePlaceholder
-      eyebrow="地图页面空壳"
+    <MapPrototypePage
+      coordinateSystem="BD09"
+      credentialName="AK"
+      shortName="BM"
       title="百度地图"
-      description="百度地图 SDK、Marker 和 AK 配置将在后续地图阶段接入。"
+      tone="blue"
     />
   );
 }

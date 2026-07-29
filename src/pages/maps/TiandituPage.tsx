@@ -1,11 +1,13 @@
-import { PagePlaceholder } from '@/components/PagePlaceholder';
+import { MapPrototypePage } from '@/components/MapPrototypePage';
 
 export function TiandituPage() {
   return (
-    <PagePlaceholder
-      eyebrow="地图页面空壳"
+    <MapPrototypePage
+      coordinateSystem="WGS84 / CGCS2000"
+      credentialName="Token"
+      shortName="TD"
       title="天地图"
-      description="天地图 SDK、Marker、Token 和坐标契约将在后续地图阶段接入。"
+      tone="green"
     />
   );
 }
