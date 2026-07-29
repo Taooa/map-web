@@ -1,5 +1,4 @@
 export type { Coordinate, GeographicCoordinate, ProjectedCoordinate } from './coordinate';
-export type { CoordinateError, CoordinateErrorCode } from './coordinate-errors';
 export { coordinateSystemDefinitions, coordinateSystemIds } from './coordinate-system';
 export type {
   CoordinateSystemDefinition,
@@ -11,10 +10,4 @@ export type {
   GeographicCoordinateSystemId,
   ProjectedCoordinateSystemId,
 } from './coordinate-system';
-export type {
-  ConvertedCoordinate,
-  ConvertedCoordinateCache,
-  TransformationAlgorithmStatus,
-  TransformationMetadata,
-  TransformationStep,
-} from './transformation';
+export type { ConvertedCoordinate, ConvertedCoordinateCache } from './transformation';

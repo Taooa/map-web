@@ -1,11 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type {
-  AlgorithmId,
-  AlgorithmVersion,
-  IsoDateTime,
-  PointId,
-  TransformationPathSignature,
-} from '@/domain/shared';
+import type { IsoDateTime, PointId } from '@/domain/shared';
 import type { Point } from '@/domain/points';
 
 const createdAt = '2026-07-29T02:00:00.000Z' as IsoDateTime;
@@ -77,19 +71,8 @@ describe('point domain', () => {
               lng: 121.478,
               lat: 31.228,
             },
-            transformation: {
-              generatedAt: createdAt,
-              pathSignature: 'wgs84-gcj02:v1' as TransformationPathSignature,
-              steps: [
-                {
-                  algorithmId: 'gcoord-wgs84-gcj02' as AlgorithmId,
-                  algorithmVersion: '1.0.0' as AlgorithmVersion,
-                  source: 'WGS84',
-                  target: 'GCJ02',
-                  status: 'verified',
-                },
-              ],
-            },
+            generatedAt: createdAt,
+            algorithmVersion: '1.0.0',
           },
         },
       },

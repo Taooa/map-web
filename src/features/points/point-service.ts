@@ -1,13 +1,5 @@
 import type { PointRepository } from '@/adapters/storage';
-import type {
-  Coordinate,
-  CoordinateSystemId,
-  IsoDateTime,
-  Point,
-  PointError,
-  PointId,
-  Result,
-} from '@/domain';
+import type { Coordinate, CoordinateSystemId, IsoDateTime, Point, PointId, Result } from '@/domain';
 
 export interface CreatePointInput {
   readonly name: string;
@@ -16,7 +8,20 @@ export interface CreatePointInput {
   readonly second: number;
 }
 
-export type PointServiceResult<Value> = Result<Value, PointError>;
+export type PointServiceErrorCode =
+  | 'EMPTY_NAME'
+  | 'INVALID_COORDINATE'
+  | 'POINT_NOT_FOUND'
+  | 'DUPLICATE_POINT_ID'
+  | 'REPOSITORY_FAILURE';
+
+export interface PointServiceError {
+  readonly code: PointServiceErrorCode;
+  readonly message: string;
+  readonly pointId?: PointId;
+}
+
+export type PointServiceResult<Value> = Result<Value, PointServiceError>;
 
 export interface PointService {
   createPoint(input: CreatePointInput): Promise<PointServiceResult<Point>>;
@@ -34,7 +39,7 @@ function success<Value>(value: Value): PointServiceResult<Value> {
   return { status: 'success', value };
 }
 
-function failure(error: PointError): PointServiceResult<never> {
+function failure(error: PointServiceError): PointServiceResult<never> {
   return { status: 'failure', error };
 }
 
@@ -117,7 +122,7 @@ export function createPointService(
       return result.status === 'success'
         ? success(result.value)
         : failure({
-            code: result.error.code === 'CONFLICT' ? 'DUPLICATE_POINT_ID' : 'INVALID_SOURCE',
+            code: result.error.code === 'CONFLICT' ? 'DUPLICATE_POINT_ID' : 'REPOSITORY_FAILURE',
             message: result.error.message,
             pointId: point.id,
           });

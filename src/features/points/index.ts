@@ -6,4 +6,10 @@ const pointRepository = new MemoryPointRepository();
 export const pointService = createPointService(pointRepository);
 
 export { createPointService } from './point-service';
-export type { CreatePointInput, PointService, PointServiceResult } from './point-service';
+export type {
+  CreatePointInput,
+  PointService,
+  PointServiceError,
+  PointServiceErrorCode,
+  PointServiceResult,
+} from './point-service';

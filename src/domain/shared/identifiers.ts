@@ -9,7 +9,4 @@ export type Brand<Value, Name extends string> = Value & {
 
 export type PointId = Brand<string, 'PointId'>;
 export type ImportRecordId = Brand<string, 'ImportRecordId'>;
-export type AlgorithmId = Brand<string, 'AlgorithmId'>;
-export type AlgorithmVersion = Brand<string, 'AlgorithmVersion'>;
-export type TransformationPathSignature = Brand<string, 'TransformationPathSignature'>;
 export type IsoDateTime = Brand<string, 'IsoDateTime'>;
