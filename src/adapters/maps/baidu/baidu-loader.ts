@@ -3,6 +3,7 @@ export type BaiduPointInstance = object;
 export interface BaiduMarkerInstance {
   setTitle(title: string): void;
   addEventListener(event: 'click', handler: () => void): void;
+  removeEventListener?(event: 'click', handler: () => void): void;
   getPosition(): BaiduPointInstance;
 }
 
@@ -14,6 +15,7 @@ export interface BaiduMapInstance {
   addOverlay(marker: BaiduMarkerInstance): void;
   removeOverlay(marker: BaiduMarkerInstance): void;
   openInfoWindow(infoWindow: BaiduInfoWindowInstance, point: BaiduPointInstance): void;
+  closeInfoWindow?(): void;
   setViewport(points: readonly BaiduPointInstance[]): void;
   getContainer(): HTMLElement;
 }

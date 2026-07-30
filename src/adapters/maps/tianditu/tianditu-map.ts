@@ -33,6 +33,8 @@ export class TiandituMap {
   readonly #map: TiandituMapInstance;
   readonly #sdk: TiandituMapSdk;
   #markers: TiandituMarkerInstance[] = [];
+  #markerListeners = new Map<TiandituMarkerInstance, () => void>();
+  #positions: TiandituLngLatInstance[] = [];
 
   constructor(container: HTMLElement, sdk: TiandituMapSdk) {
     this.#container = container;
@@ -44,32 +46,46 @@ export class TiandituMap {
   }
 
   setMarkers(markerData: readonly TiandituMarkerData[]): void {
-    this.#markers.forEach((marker) => this.#map.removeOverLay(marker));
-    this.#markers = [];
+    this.clear();
 
-    markerData.forEach((data) => {
+    this.#positions = markerData.map((data) => {
       const position: TiandituLngLatInstance = new this.#sdk.LngLat(
         data.position[0],
         data.position[1],
       );
       const marker = new this.#sdk.Marker(position);
-      marker.addEventListener('click', () => {
+      const handleClick = () => {
         const infoWindow = new this.#sdk.InfoWindow({ content: createInfoContent(data) });
         this.#map.openInfoWindow(infoWindow, position);
-      });
+      };
+      marker.addEventListener('click', handleClick);
+      this.#markerListeners.set(marker, handleClick);
       this.#map.addOverLay(marker);
       this.#markers.push(marker);
+      return position;
     });
 
-    if (markerData.length === 1) {
-      const [lng, lat] = markerData[0]!.position;
-      this.#map.centerAndZoom(new this.#sdk.LngLat(lng, lat), 15);
-    }
+    this.fitView();
+  }
+
+  fitView(): void {
+    if (this.#positions.length > 0) this.#map.centerAndZoom(this.#positions[0]!, 15);
+  }
+
+  clear(): void {
+    this.#map.closeInfoWindow?.();
+    this.#markers.forEach((marker) => {
+      const listener = this.#markerListeners.get(marker);
+      if (listener) marker.removeEventListener?.('click', listener);
+      this.#map.removeOverLay(marker);
+    });
+    this.#markers = [];
+    this.#markerListeners.clear();
+    this.#positions = [];
   }
 
   destroy(): void {
-    this.#markers.forEach((marker) => this.#map.removeOverLay(marker));
-    this.#markers = [];
+    this.clear();
     this.#container.replaceChildren();
   }
 }

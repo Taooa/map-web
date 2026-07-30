@@ -3,6 +3,7 @@ export type TiandituInfoWindowInstance = object;
 
 export interface TiandituMarkerInstance {
   addEventListener(event: 'click', handler: () => void): void;
+  removeEventListener?(event: 'click', handler: () => void): void;
 }
 
 export interface TiandituMapInstance {
@@ -12,6 +13,7 @@ export interface TiandituMapInstance {
   addOverLay(marker: TiandituMarkerInstance): void;
   removeOverLay(marker: TiandituMarkerInstance): void;
   openInfoWindow(infoWindow: TiandituInfoWindowInstance, position: TiandituLngLatInstance): void;
+  closeInfoWindow?(): void;
 }
 
 export interface TiandituMapSdk {

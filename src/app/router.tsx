@@ -1,12 +1,10 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppLayout } from '@/app/layouts/AppLayout';
-import { MapPageLayout } from '@/app/layouts/MapPageLayout';
+import { Navigate } from 'react-router-dom';
 import { HomePage } from '@/pages/HomePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { PointsPage } from '@/pages/PointsPage';
-import { AMapPage } from '@/pages/maps/AMapPage';
-import { BaiduMapPage } from '@/pages/maps/BaiduMapPage';
-import { TiandituPage } from '@/pages/maps/TiandituPage';
+import { MapWorkspacePage } from '@/pages/maps/MapWorkspacePage';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -22,21 +20,19 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: 'map',
-        element: <MapPageLayout />,
-        children: [
-          {
-            path: 'amap',
-            element: <AMapPage />,
-          },
-          {
-            path: 'baidu',
-            element: <BaiduMapPage />,
-          },
-          {
-            path: 'tianditu',
-            element: <TiandituPage />,
-          },
-        ],
+        element: <MapWorkspacePage />,
+      },
+      {
+        path: 'map/amap',
+        element: <Navigate replace to="/map?platform=amap" />,
+      },
+      {
+        path: 'map/baidu',
+        element: <Navigate replace to="/map?platform=baidu" />,
+      },
+      {
+        path: 'map/tianditu',
+        element: <Navigate replace to="/map?platform=tianditu" />,
       },
       {
         path: '*',

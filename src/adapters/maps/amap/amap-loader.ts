@@ -7,6 +7,7 @@ export interface AMapInstance {
 
 export interface AMapMarkerInstance {
   on(event: 'click', handler: () => void): void;
+  off?(event: 'click', handler: () => void): void;
   getPosition(): unknown;
 }
 

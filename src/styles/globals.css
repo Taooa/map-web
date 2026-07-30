@@ -1796,6 +1796,159 @@ input[type='checkbox'] {
 }
 
 /* Maps */
+.unified-map-workspace {
+  display: grid;
+  min-height: calc(100vh - 73px);
+  grid-template-columns: 360px minmax(0, 1fr);
+  background: #eef4f7;
+}
+
+.unified-map-panel {
+  position: relative;
+  z-index: 2;
+  padding: 26px 22px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.unified-map-panel h1 {
+  margin: 0 0 18px;
+  font-size: 25px;
+}
+
+.unified-platform-switch {
+  display: grid;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 10px;
+  background: var(--color-surface-strong);
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.unified-platform-switch button,
+.unified-point-actions button,
+.unified-credential button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.unified-platform-switch button.is-active {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.unified-point-tools {
+  margin-top: 24px;
+}
+
+.unified-point-tools > input {
+  width: 100%;
+  min-height: 40px;
+  margin: 10px 0;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.unified-point-actions {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.unified-point-actions button,
+.unified-credential button {
+  border-color: var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.unified-point-list {
+  display: grid;
+  max-height: 260px;
+  margin-top: 10px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+}
+
+.unified-point-list label {
+  display: flex;
+  padding: 9px 10px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 11px;
+}
+
+.unified-point-list label:last-child {
+  border-bottom: 0;
+}
+
+.unified-credential {
+  display: flex;
+  margin-top: 18px;
+  padding: 12px 0;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 10px;
+}
+
+.platform-toolbar {
+  display: grid;
+  margin-top: 18px;
+  padding: 14px;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-subtle);
+}
+
+.platform-toolbar > strong {
+  font-size: 11px;
+}
+
+.platform-toolbar label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.platform-toolbar select {
+  min-width: 110px;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+
+.platform-toolbar .toolbar-check {
+  justify-content: flex-start;
+}
+
+.unified-map-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: calc(100vh - 73px);
+}
+
+.unified-map-container {
+  position: absolute;
+  inset: 0;
+}
+
 .map-workspace {
   --map-tone: #cb842b;
   --map-tone-soft: #fff1dc;
@@ -2601,6 +2754,20 @@ input[type='checkbox'] {
 }
 
 @media (max-width: 760px) {
+  .unified-map-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .unified-map-panel {
+    max-height: 52vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .unified-map-canvas {
+    min-height: 58vh;
+  }
+
   .app-header {
     min-height: auto;
     padding: 13px 16px;

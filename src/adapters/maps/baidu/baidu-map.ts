@@ -2,6 +2,7 @@ import type {
   BaiduMapInstance,
   BaiduMapSdk,
   BaiduMarkerInstance,
+  BaiduPointInstance,
 } from './baidu-loader';
 
 export interface BaiduMarkerData {
@@ -34,6 +35,8 @@ export class BaiduMap {
   readonly #map: BaiduMapInstance;
   readonly #sdk: BaiduMapSdk;
   #markers: BaiduMarkerInstance[] = [];
+  #markerListeners = new Map<BaiduMarkerInstance, () => void>();
+  #viewportPoints: BaiduPointInstance[] = [];
 
   constructor(container: HTMLElement, sdk: BaiduMapSdk) {
     this.#container = container;
@@ -44,30 +47,44 @@ export class BaiduMap {
   }
 
   setMarkers(markerData: readonly BaiduMarkerData[]): void {
-    this.#markers.forEach((marker) => this.#map.removeOverlay(marker));
-    this.#markers = [];
+    this.clear();
 
-    const viewportPoints = markerData.map((data) => {
+    this.#viewportPoints = markerData.map((data) => {
       const point = new this.#sdk.Point(data.position[0], data.position[1]);
       const marker = new this.#sdk.Marker(point);
       marker.setTitle(data.name);
-      marker.addEventListener('click', () => {
+      const handleClick = () => {
         const infoWindow = new this.#sdk.InfoWindow(createInfoContent(data));
         this.#map.openInfoWindow(infoWindow, marker.getPosition());
-      });
+      };
+      marker.addEventListener('click', handleClick);
+      this.#markerListeners.set(marker, handleClick);
       this.#map.addOverlay(marker);
       this.#markers.push(marker);
       return point;
     });
 
-    if (viewportPoints.length > 0) {
-      this.#map.setViewport(viewportPoints);
-    }
+    this.fitView();
+  }
+
+  fitView(): void {
+    if (this.#viewportPoints.length > 0) this.#map.setViewport(this.#viewportPoints);
+  }
+
+  clear(): void {
+    this.#map.closeInfoWindow?.();
+    this.#markers.forEach((marker) => {
+      const listener = this.#markerListeners.get(marker);
+      if (listener) marker.removeEventListener?.('click', listener);
+      this.#map.removeOverlay(marker);
+    });
+    this.#markers = [];
+    this.#markerListeners.clear();
+    this.#viewportPoints = [];
   }
 
   destroy(): void {
-    this.#markers.forEach((marker) => this.#map.removeOverlay(marker));
-    this.#markers = [];
+    this.clear();
     this.#container.replaceChildren();
   }
 }

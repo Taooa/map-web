@@ -60,38 +60,45 @@ describe('visible page prototypes', () => {
     expect(screen.getByText('121.54866172656749, 31.21937229419649')).toBeVisible();
   });
 
-  it('opens map credential configuration as a placeholder interaction', async () => {
+  it('uses the shared map workspace and switches platform toolbars', async () => {
     const user = userEvent.setup();
     localStorage.clear();
     renderRoute('/map/amap');
 
-    expect(screen.getByRole('heading', { name: '请先配置高德地图密钥' })).toBeVisible();
-    expect(screen.getByText('没有密钥时不会请求或加载高德地图服务。')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: '请先配置密钥' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: '搜索点位' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '显示全部点位' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '清空地图' })).toBeVisible();
+    expect(screen.getByText('高德专属设置')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '配置密钥' }));
-    expect(screen.getByRole('dialog', { name: '配置高德地图密钥' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: '配置密钥' })).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: '百度地图' }));
+    expect(await screen.findByText('百度专属设置')).toBeVisible();
+    expect(screen.queryByText('高德专属设置')).not.toBeInTheDocument();
   });
 
-  it('does not load Baidu Map without an AK and opens its configuration', async () => {
+  it('opens Baidu in the same workspace with independent settings', async () => {
     const user = userEvent.setup();
     localStorage.clear();
     renderRoute('/map/baidu');
 
-    expect(screen.getByRole('heading', { name: '请先配置百度地图访问密钥' })).toBeVisible();
-    expect(screen.getByText('没有访问密钥时不会请求或加载百度地图服务。')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: '请先配置访问密钥' })).toBeVisible();
+    expect(screen.getByText('百度专属设置')).toBeVisible();
     const configureButtons = screen.getAllByRole('button', { name: /配置访问密钥/ });
     await user.click(configureButtons[0]!);
-    expect(screen.getByRole('dialog', { name: '配置百度地图访问密钥' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: '配置访问密钥' })).toBeVisible();
   });
 
-  it('does not load Tianditu without a Token and opens its configuration', async () => {
+  it('opens Tianditu in the same workspace with independent settings', async () => {
     const user = userEvent.setup();
     renderRoute('/map/tianditu');
 
-    expect(screen.getByRole('heading', { name: '请先配置天地图访问令牌' })).toBeVisible();
-    expect(screen.getByText('没有访问令牌时不会请求或加载天地图服务。')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: '请先配置访问令牌' })).toBeVisible();
+    expect(screen.getByText('天地图专属设置')).toBeVisible();
     const configureButtons = screen.getAllByRole('button', { name: /配置访问令牌/ });
     await user.click(configureButtons[0]!);
-    expect(screen.getByRole('dialog', { name: '配置天地图访问令牌' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: '配置访问令牌' })).toBeVisible();
   });
 
   it('opens the Excel import workflow from Point Manager', async () => {

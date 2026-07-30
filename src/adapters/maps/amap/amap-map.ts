@@ -34,6 +34,7 @@ export class AMapMap {
   readonly #map: AMapInstance;
   readonly #sdk: AMapSdk;
   #markers: AMapMarkerInstance[] = [];
+  #markerListeners = new Map<AMapMarkerInstance, () => void>();
   #infoWindow: AMapInfoWindowInstance | null = null;
 
   constructor(container: HTMLElement, sdk: AMapSdk) {
@@ -45,38 +46,50 @@ export class AMapMap {
   }
 
   setMarkers(markerData: readonly AMapMarkerData[]): void {
-    if (this.#markers.length > 0) {
-      this.#map.remove(this.#markers);
-    }
-    this.#infoWindow?.close();
-    this.#infoWindow = null;
+    this.clear();
 
     this.#markers = markerData.map((data) => {
       const marker = new this.#sdk.Marker({
         position: data.position,
         title: data.name,
       });
-      marker.on('click', () => {
+      const handleClick = () => {
         this.#infoWindow?.close();
         this.#infoWindow = new this.#sdk.InfoWindow({
           content: createInfoContent(data),
           offset: [0, -24],
         });
         this.#infoWindow.open(this.#map, marker.getPosition());
-      });
+      };
+      marker.on('click', handleClick);
+      this.#markerListeners.set(marker, handleClick);
       return marker;
     });
 
     if (this.#markers.length > 0) {
       this.#map.add(this.#markers);
-      this.#map.setFitView(this.#markers);
+      this.fitView();
     }
   }
 
-  destroy(): void {
+  fitView(): void {
+    if (this.#markers.length > 0) this.#map.setFitView(this.#markers);
+  }
+
+  clear(): void {
+    this.#markers.forEach((marker) => {
+      const listener = this.#markerListeners.get(marker);
+      if (listener) marker.off?.('click', listener);
+    });
+    if (this.#markers.length > 0) this.#map.remove(this.#markers);
+    this.#markers = [];
+    this.#markerListeners.clear();
     this.#infoWindow?.close();
     this.#infoWindow = null;
-    this.#markers = [];
+  }
+
+  destroy(): void {
+    this.clear();
     this.#map.destroy();
   }
 }
