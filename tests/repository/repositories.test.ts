@@ -28,6 +28,11 @@ class MockPointRepository implements PointRepository {
     return Promise.resolve(success(point));
   }
 
+  createMany(points: readonly Point[]): Promise<RepositoryResult<readonly Point[]>> {
+    points.forEach((point) => this.#points.set(point.id, point));
+    return Promise.resolve(success(points));
+  }
+
   update(point: Point): Promise<RepositoryResult<Point>> {
     this.#points.set(point.id, point);
     return Promise.resolve(success(point));

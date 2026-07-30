@@ -71,7 +71,7 @@ describe('point domain', () => {
               lng: 121.478,
               lat: 31.228,
             },
-            generatedAt: createdAt,
+            transformedAt: createdAt,
             algorithmVersion: '1.0.0',
           },
         },

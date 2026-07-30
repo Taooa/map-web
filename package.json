@@ -20,9 +20,11 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "gcoord": "0.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router-dom": "7.18.2"
+    "react-router-dom": "7.18.2",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -36,6 +38,7 @@
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
+    "fake-indexeddb": "6.2.5",
     "globals": "17.8.0",
     "jsdom": "30.0.0",
     "prettier": "3.9.6",

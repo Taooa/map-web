@@ -4,7 +4,7 @@ import type { CoordinateSystemId } from './coordinate-system';
 
 export interface ConvertedCoordinate {
   readonly coordinate: Coordinate;
-  readonly generatedAt: IsoDateTime;
+  readonly transformedAt: IsoDateTime;
   readonly algorithmVersion: string;
 }
 

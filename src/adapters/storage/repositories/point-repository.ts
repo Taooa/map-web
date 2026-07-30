@@ -18,6 +18,7 @@ export interface PointRepository {
   get(id: PointId): Promise<RepositoryResult<Point | null>>;
   list(query?: PointListQuery): Promise<RepositoryResult<readonly Point[]>>;
   create(point: Point): Promise<RepositoryResult<Point>>;
+  createMany(points: readonly Point[]): Promise<RepositoryResult<readonly Point[]>>;
   update(point: Point): Promise<RepositoryResult<Point>>;
   delete(id: PointId): Promise<RepositoryResult<void>>;
 }

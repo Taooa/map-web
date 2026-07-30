@@ -40,6 +40,20 @@ export class MemoryPointRepository implements PointRepository {
     return Promise.resolve(success(point));
   }
 
+  createMany(points: readonly Point[]): Promise<RepositoryResult<readonly Point[]>> {
+    const ids = new Set<PointId>();
+    const conflict = points.find((point) => this.#points.has(point.id) || ids.has(point.id));
+    if (conflict) {
+      return Promise.resolve(failure('CONFLICT', `Point ${conflict.id} already exists.`));
+    }
+
+    points.forEach((point) => {
+      ids.add(point.id);
+      this.#points.set(point.id, point);
+    });
+    return Promise.resolve(success(points));
+  }
+
   update(point: Point): Promise<RepositoryResult<Point>> {
     const existing = this.#points.get(point.id);
     if (!existing) {

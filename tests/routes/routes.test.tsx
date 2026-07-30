@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { renderRoute } from '@/test/render';
 
 describe.each([
-  ['/points', 'Point Manager'],
+  ['/points', '点位管理'],
   ['/map/amap', '高德地图'],
   ['/map/baidu', '百度地图'],
   ['/map/tianditu', '天地图'],

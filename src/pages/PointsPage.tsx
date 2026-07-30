@@ -1,9 +1,31 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from 'react';
+import type { ExcelWorkbookData } from '@/adapters/files/excel-parser';
 import { ToolIcon } from '@/components/ToolIcon';
-import type { CoordinateSystemId, Point, PointId } from '@/domain';
-import { pointService } from '@/features/points';
+import type { Coordinate, CoordinateSystemId, Point, PointId } from '@/domain';
+import type {
+  ExcelFieldMapping,
+  ExcelImportCoordinateSystem,
+} from '@/features/import/excel-importer';
+import {
+  importService,
+  type ExcelImportSummary,
+} from '@/features/import/import-service';
+import {
+  getPointStorageStatus,
+  pointService,
+  subscribePointStorageStatus,
+} from '@/features/points';
 
 type EntrySystem = Extract<CoordinateSystemId, 'WGS84' | 'GCJ02' | 'BD09' | 'SHANGHAI2000'>;
+type TransformSystem = Extract<CoordinateSystemId, 'WGS84' | 'GCJ02' | 'BD09'>;
+
+const transformSystems: readonly TransformSystem[] = ['WGS84', 'GCJ02', 'BD09'];
 
 const systemLabels: Readonly<Record<EntrySystem, string>> = {
   WGS84: 'WGS84',
@@ -13,10 +35,20 @@ const systemLabels: Readonly<Record<EntrySystem, string>> = {
 };
 
 function formatCoordinate(point: Point): string {
-  const coordinate = point.coordinates.original;
+  return formatCoordinateValue(point.coordinates.original);
+}
+
+function formatCoordinateValue(coordinate: Coordinate): string {
   return coordinate.kind === 'geographic'
     ? `${coordinate.lng}, ${coordinate.lat}`
     : `X ${coordinate.x} · Y ${coordinate.y}`;
+}
+
+function getTransformTargets(point: Point): readonly TransformSystem[] {
+  const source = point.coordinates.original.system;
+  return transformSystems.includes(source as TransformSystem)
+    ? transformSystems.filter((system) => system !== source)
+    : [];
 }
 
 function formatDate(value: string): string {
@@ -28,14 +60,32 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+function formatPointSource(point: Point): { label: string; detail: string } {
+  return point.source.type === 'manual'
+    ? { label: '手动添加', detail: '点位管理' }
+    : {
+        label: '表格导入',
+        detail: point.source.sourceRow ? `源文件第 ${point.source.sourceRow} 行` : '批量导入',
+      };
+}
+
 export function PointsPage() {
+  const storageStatus = useSyncExternalStore(
+    subscribePointStorageStatus,
+    getPointStorageStatus,
+    getPointStorageStatus,
+  );
   const [points, setPoints] = useState<readonly Point[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [activePoint, setActivePoint] = useState<Point | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [transformTarget, setTransformTarget] = useState<TransformSystem>('GCJ02');
+  const [transformError, setTransformError] = useState<string | null>(null);
+  const [transforming, setTransforming] = useState(false);
 
   const loadPoints = useCallback(async (search = '') => {
     setLoading(true);
@@ -72,6 +122,12 @@ export function PointsPage() {
     setFeedback(`已添加“${point.name}”。`);
   }
 
+  async function handleImported(summary: ExcelImportSummary) {
+    setQuery('');
+    await loadPoints();
+    setFeedback(`表格导入完成：成功 ${summary.successCount} 条，失败 ${summary.failureCount} 条。`);
+  }
+
   async function handleDelete(id: PointId) {
     const result = await pointService.deletePoint(id);
     if (result.status === 'failure') {
@@ -85,16 +141,48 @@ export function PointsPage() {
     setFeedback('点位已删除。');
   }
 
+  function openPointDetails(point: Point) {
+    const [firstTarget] = getTransformTargets(point);
+    setActivePoint(point);
+    setShowDeleteConfirm(false);
+    setTransformError(null);
+    if (firstTarget) {
+      setTransformTarget(firstTarget);
+    }
+  }
+
+  async function handleTransform() {
+    if (!activePoint) return;
+
+    setTransforming(true);
+    setTransformError(null);
+    const result = await pointService.transformPoint(activePoint.id, transformTarget);
+    setTransforming(false);
+
+    if (result.status === 'failure') {
+      setTransformError(result.error.message);
+      return;
+    }
+
+    setActivePoint(result.value);
+    await loadPoints(query);
+    setFeedback(`已生成 ${transformTarget} 坐标。`);
+  }
+
   return (
     <div className="points-page">
       <header className="workspace-header">
         <div>
-          <p className="eyebrow">POINT WORKSPACE</p>
-          <h1>Point Manager</h1>
+          <p className="eyebrow">点位工作台</p>
+          <h1>点位管理</h1>
           <p>集中管理设备点位、坐标状态与地图验证入口。</p>
         </div>
         <div className="workspace-header__actions">
-          <button className="button button--secondary" disabled type="button">
+          <button
+            className="button button--secondary"
+            onClick={() => setShowImportDialog(true)}
+            type="button"
+          >
             <ToolIcon name="upload" />
             导入点位
           </button>
@@ -109,11 +197,20 @@ export function PointsPage() {
         </div>
       </header>
 
-      <div className="memory-notice" role="note">
+      <div
+        className={`memory-notice ${
+          storageStatus.mode === 'indexeddb' ? 'memory-notice--persistent' : ''
+        }`}
+        role="note"
+      >
         <ToolIcon name="database" size={17} />
         <span>
-          <strong>当前使用内存数据</strong>
-          页面刷新后点位会丢失；浏览器持久化将在后续阶段接入。
+          <strong>
+            {storageStatus.mode === 'indexeddb'
+              ? 'IndexedDB 持久化已启用'
+              : '当前使用内存数据'}
+          </strong>
+          {storageStatus.message}
         </span>
       </div>
 
@@ -170,16 +267,14 @@ export function PointsPage() {
                 {points.map((point) => {
                   const label = systemLabels[point.coordinates.original.system as EntrySystem];
                   const convertedSystems = Object.keys(point.coordinates.converted);
+                  const source = formatPointSource(point);
 
                   return (
                     <tr key={point.id}>
                       <td>
                         <button
                           className="point-name"
-                          onClick={() => {
-                            setActivePoint(point);
-                            setShowDeleteConfirm(false);
-                          }}
+                          onClick={() => openPointDetails(point)}
                           type="button"
                         >
                           <span className="point-name__marker">
@@ -193,8 +288,8 @@ export function PointsPage() {
                       </td>
                       <td>
                         <span className="source-cell">
-                          <strong>手动添加</strong>
-                          <small>Point Manager</small>
+                          <strong>{source.label}</strong>
+                          <small>{source.detail}</small>
                         </span>
                       </td>
                       <td>
@@ -227,10 +322,7 @@ export function PointsPage() {
                         <button
                           aria-label={`查看 ${point.name} 详情`}
                           className="row-action"
-                          onClick={() => {
-                            setActivePoint(point);
-                            setShowDeleteConfirm(false);
-                          }}
+                          onClick={() => openPointDetails(point)}
                           type="button"
                         >
                           查看
@@ -299,7 +391,7 @@ export function PointsPage() {
           >
             <header className="drawer-header">
               <div>
-                <p className="eyebrow">POINT DETAILS</p>
+                <p className="eyebrow">点位详情</p>
                 <h2 id="point-detail-title">{activePoint.name}</h2>
               </div>
               <button
@@ -318,7 +410,9 @@ export function PointsPage() {
                 </span>
                 <div>
                   <strong>{activePoint.id}</strong>
-                  <small>手动添加 · {formatDate(activePoint.updatedAt)}</small>
+                  <small>
+                    {formatPointSource(activePoint).label} · {formatDate(activePoint.updatedAt)}
+                  </small>
                 </div>
               </div>
               <section className="detail-section">
@@ -340,10 +434,69 @@ export function PointsPage() {
               </section>
               <section className="detail-section">
                 <span className="detail-section__label">转换结果</span>
-                <div className="detail-empty">
-                  <ToolIcon name="transform" />
-                  <span>这个点位还没有转换结果</span>
-                </div>
+                {transformSystems
+                  .filter((system) => activePoint.coordinates.converted[system])
+                  .map((system) => {
+                    const converted = activePoint.coordinates.converted[system];
+                    if (!converted) return null;
+
+                    return (
+                      <div className="coordinate-detail-card" key={system}>
+                        <div>
+                          <span className={`coordinate-badge coordinate-badge--${system}`}>
+                            {system}
+                            <small>转换</small>
+                          </span>
+                          <span className="status-dot">
+                            {formatDate(converted.transformedAt)}
+                          </span>
+                        </div>
+                        <code>{formatCoordinateValue(converted.coordinate)}</code>
+                        <small className="algorithm-version">
+                          算法版本 {converted.algorithmVersion}
+                        </small>
+                      </div>
+                    );
+                  })}
+                {Object.keys(activePoint.coordinates.converted).length === 0 && (
+                  <div className="detail-empty">
+                    <ToolIcon name="transform" />
+                    <span>这个点位还没有转换结果</span>
+                  </div>
+                )}
+              </section>
+              <section className="detail-section">
+                <span className="detail-section__label">生成坐标</span>
+                {getTransformTargets(activePoint).length > 0 ? (
+                  <div className="transform-panel">
+                    <label className="form-field">
+                      <span>目标坐标系</span>
+                      <select
+                        onChange={(event) =>
+                          setTransformTarget(event.target.value as TransformSystem)
+                        }
+                        value={transformTarget}
+                      >
+                        {getTransformTargets(activePoint).map((system) => (
+                          <option key={system} value={system}>
+                            {system}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p>转换结果会单独保存，原始坐标不会改变。</p>
+                    {transformError && (
+                      <div className="form-error" role="alert">
+                        {transformError}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="detail-empty">
+                    <ToolIcon name="transform" />
+                    <span>上海2000暂不支持坐标转换</span>
+                  </div>
+                )}
               </section>
               <div className="prototype-note">
                 <ToolIcon name="database" size={17} />
@@ -380,9 +533,14 @@ export function PointsPage() {
               >
                 删除点位
               </button>
-              <button className="button button--primary" disabled type="button">
+              <button
+                className="button button--primary"
+                disabled={transforming || getTransformTargets(activePoint).length === 0}
+                onClick={() => void handleTransform()}
+                type="button"
+              >
                 <ToolIcon name="transform" />
-                转换坐标
+                {transforming ? '正在转换…' : '转换坐标'}
               </button>
             </footer>
           </aside>
@@ -393,6 +551,13 @@ export function PointsPage() {
         <AddPointDialog
           onCancel={() => setShowAddDialog(false)}
           onCreated={(point) => void handleCreated(point)}
+        />
+      )}
+
+      {showImportDialog && (
+        <ExcelImportDialog
+          onCancel={() => setShowImportDialog(false)}
+          onImported={(summary) => void handleImported(summary)}
         />
       )}
     </div>
@@ -444,7 +609,7 @@ function AddPointDialog({ onCancel, onCreated }: AddPointDialogProps) {
       >
         <header className="point-form-dialog__header">
           <div>
-            <p className="eyebrow">NEW POINT</p>
+            <p className="eyebrow">新增点位</p>
             <h2 id="add-point-title">新增点位</h2>
             <p>坐标将作为原始值保存，创建后不会被转换操作覆盖。</p>
           </div>
@@ -469,7 +634,7 @@ function AddPointDialog({ onCancel, onCreated }: AddPointDialogProps) {
               <input
                 autoFocus
                 onChange={(event) => setName(event.target.value)}
-                placeholder="例如：浦东机房 A-01"
+                placeholder="例如：设备点位 01"
                 required
                 value={name}
               />
@@ -527,6 +692,244 @@ function AddPointDialog({ onCancel, onCreated }: AddPointDialogProps) {
             </button>
           </footer>
         </form>
+      </section>
+    </div>
+  );
+}
+
+interface ExcelImportDialogProps {
+  readonly onCancel: () => void;
+  readonly onImported: (summary: ExcelImportSummary) => void;
+}
+
+const defaultMapping: ExcelFieldMapping = {
+  nameColumn: 0,
+  longitudeColumn: 1,
+  latitudeColumn: 2,
+};
+
+function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
+  const [workbook, setWorkbook] = useState<ExcelWorkbookData | null>(null);
+  const [sheetName, setSheetName] = useState('');
+  const [mapping, setMapping] = useState<ExcelFieldMapping>(defaultMapping);
+  const [system, setSystem] = useState<ExcelImportCoordinateSystem>('WGS84');
+  const [fileName, setFileName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [summary, setSummary] = useState<ExcelImportSummary | null>(null);
+
+  const selectedSheet =
+    workbook?.sheets.find((sheet) => sheet.name === sheetName) ?? workbook?.sheets[0] ?? null;
+
+  async function handleFile(file: File | undefined) {
+    setError(null);
+    setSummary(null);
+    setWorkbook(null);
+    if (!file) return;
+    if (!file.name.toLocaleLowerCase().endsWith('.xlsx')) {
+      setError('请选择 .xlsx 文件。');
+      return;
+    }
+
+    const { parseExcelWorkbook } = await import('@/adapters/files/excel-parser');
+    const result = parseExcelWorkbook(await file.arrayBuffer());
+    if (result.status === 'failure') {
+      setError(result.error.message);
+      return;
+    }
+
+    const [firstSheet] = result.value.sheets;
+    setFileName(file.name);
+    setWorkbook(result.value);
+    setSheetName(firstSheet?.name ?? '');
+    setMapping(defaultMapping);
+  }
+
+  function updateMapping(field: keyof ExcelFieldMapping, value: number) {
+    setMapping((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleImport() {
+    if (!selectedSheet) {
+      setError('请先选择包含数据的 Sheet。');
+      return;
+    }
+    if (selectedSheet.columns.length < 3) {
+      setError('当前 Sheet 至少需要三列数据。');
+      return;
+    }
+    if (new Set(Object.values(mapping)).size !== 3) {
+      setError('名称、经度和纬度必须映射到不同列。');
+      return;
+    }
+
+    setImporting(true);
+    setError(null);
+    const result = await importService.importExcelSheet({
+      sheet: selectedSheet,
+      mapping,
+      system,
+    });
+    setImporting(false);
+    setSummary(result);
+    onImported(result);
+  }
+
+  return (
+    <div className="overlay overlay--center" onMouseDown={onCancel}>
+      <section
+        aria-labelledby="excel-import-title"
+        aria-modal="true"
+        className="point-form-dialog excel-import-dialog"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <header className="point-form-dialog__header">
+          <div>
+            <p className="eyebrow">表格导入</p>
+            <h2 id="excel-import-title">导入表格点位</h2>
+            <p>上传 .xlsx 文件，选择工作表并映射点位字段。</p>
+          </div>
+          <button aria-label="关闭表格导入" className="icon-button" onClick={onCancel} type="button">
+            <ToolIcon name="close" />
+          </button>
+        </header>
+
+        <div className="point-form-dialog__body">
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          )}
+
+          {!summary && (
+            <>
+              <label className="form-field">
+                <span>表格文件</span>
+                <input
+                  accept=".xlsx"
+                  aria-label="表格文件"
+                  onChange={(event) => void handleFile(event.target.files?.[0])}
+                  type="file"
+                />
+                <small>{fileName || '第一版仅支持 .xlsx 文件。'}</small>
+              </label>
+
+              {workbook && selectedSheet && (
+                <>
+                  <label className="form-field">
+                    <span>Sheet</span>
+                    <select
+                      onChange={(event) => {
+                        setSheetName(event.target.value);
+                        setMapping(defaultMapping);
+                      }}
+                      value={selectedSheet.name}
+                    >
+                      {workbook.sheets.map((sheet) => (
+                        <option key={sheet.name} value={sheet.name}>
+                          {sheet.name}（{sheet.rows.length} 行）
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="excel-mapping-grid">
+                    {[
+                      ['nameColumn', '点位名称列'],
+                      ['longitudeColumn', system === 'SHANGHAI2000' ? 'X 坐标列' : '经度列'],
+                      ['latitudeColumn', system === 'SHANGHAI2000' ? 'Y 坐标列' : '纬度列'],
+                    ].map(([field, label]) => (
+                      <label className="form-field" key={field}>
+                        <span>{label}</span>
+                        <select
+                          onChange={(event) =>
+                            updateMapping(
+                              field as keyof ExcelFieldMapping,
+                              Number(event.target.value),
+                            )
+                          }
+                          value={mapping[field as keyof ExcelFieldMapping]}
+                        >
+                          {selectedSheet.columns.map((column) => (
+                            <option key={column.index} value={column.index}>
+                              {column.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+
+                  <label className="form-field">
+                    <span>文件坐标系</span>
+                    <select
+                      onChange={(event) =>
+                        setSystem(event.target.value as ExcelImportCoordinateSystem)
+                      }
+                      value={system}
+                    >
+                      <option value="WGS84">WGS84（默认）</option>
+                      <option value="GCJ02">GCJ02</option>
+                      <option value="BD09">BD09</option>
+                      <option value="SHANGHAI2000">上海2000（仅导入，不参与转换）</option>
+                    </select>
+                    <small>一个文件中的当前 Sheet 统一使用同一坐标系。</small>
+                  </label>
+                </>
+              )}
+            </>
+          )}
+
+          {summary && (
+            <div className="import-summary">
+              <div className="import-summary__metrics">
+                <span>
+                  <strong>{summary.successCount}</strong>
+                  成功
+                </span>
+                <span className={summary.failureCount ? 'has-failures' : ''}>
+                  <strong>{summary.failureCount}</strong>
+                  失败
+                </span>
+              </div>
+              {summary.failures.length > 0 ? (
+                <div className="import-failure-list">
+                  {summary.failures.map((failure) => (
+                    <div key={`${failure.row}-${failure.reason}`}>
+                      <strong>第 {failure.row} 行</strong>
+                      <span>{failure.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="inline-feedback">全部点位已成功导入。</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <footer className="point-form-dialog__footer">
+          {!summary ? (
+            <>
+              <button className="button button--quiet" onClick={onCancel} type="button">
+                取消
+              </button>
+              <button
+                className="button button--primary"
+                disabled={!selectedSheet || importing}
+                onClick={() => void handleImport()}
+                type="button"
+              >
+                {importing ? '正在导入…' : '开始导入'}
+              </button>
+            </>
+          ) : (
+            <button className="button button--primary" onClick={onCancel} type="button">
+              完成
+            </button>
+          )}
+        </footer>
       </section>
     </div>
   );

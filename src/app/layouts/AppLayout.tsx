@@ -1,18 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { appNavigation } from '@/config/routes';
-import { ToolIcon } from '@/components/ToolIcon';
 
 export function AppLayout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <NavLink className="app-brand" to="/" aria-label="Coordinate Toolkit 首页">
-          <span className="app-brand__mark" aria-hidden="true">
-            <ToolIcon name="target" size={20} />
-          </span>
+        <NavLink className="app-brand" to="/" aria-label="地图工具首页">
+          <img className="app-brand__logo" src="/brand/logo-192.png" alt="地图工具" />
           <span className="app-brand__text">
-            Coordinate Toolkit
-            <small>by PeachTools</small>
+            <span className="app-brand__name">地图工具</span>
+            <small>点位坐标转换与地图验证</small>
           </span>
         </NavLink>
 

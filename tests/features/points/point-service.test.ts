@@ -104,4 +104,99 @@ describe('PointService', () => {
       error: { code: 'INVALID_COORDINATE' },
     });
   });
+
+  it('transforms one point, writes converted data and preserves original', async () => {
+    const { repository, service } = setup();
+    const created = await service.createPoint({
+      name: '人民广场设备',
+      system: 'WGS84',
+      first: 121.4737,
+      second: 31.2304,
+    });
+    expect(created.status).toBe('success');
+    if (created.status !== 'success') return;
+    const original = created.value.coordinates.original;
+
+    const transformed = await service.transformPoint(pointId, 'GCJ02');
+
+    expect(transformed).toMatchObject({
+      status: 'success',
+      value: {
+        coordinates: {
+          original: {
+            kind: 'geographic',
+            system: 'WGS84',
+            lng: 121.4737,
+            lat: 31.2304,
+          },
+          converted: {
+            GCJ02: {
+              coordinate: {
+                kind: 'geographic',
+                system: 'GCJ02',
+                lng: 121.47822305927693,
+                lat: 31.22845773757727,
+              },
+              algorithmVersion: 'gcoord@0.3.2',
+              transformedAt: timestamp,
+            },
+          },
+        },
+        updatedAt: timestamp,
+      },
+    });
+    if (transformed.status === 'success') {
+      expect(transformed.value.coordinates.original).toBe(original);
+      expect(await repository.get(pointId)).toEqual(transformed);
+    }
+  });
+
+  it('rejects unsupported transformation without writing converted data', async () => {
+    const { repository, service } = setup();
+    await service.createPoint({
+      name: '上海2000点位',
+      system: 'SHANGHAI2000',
+      first: 506842.31,
+      second: 3459278.64,
+    });
+
+    const transformed = await service.transformPoint(pointId, 'WGS84');
+
+    expect(transformed).toMatchObject({
+      status: 'failure',
+      error: { code: 'UNSUPPORTED_TRANSFORMATION', pointId },
+    });
+    const stored = await repository.get(pointId);
+    expect(stored).toMatchObject({
+      status: 'success',
+      value: { coordinates: { converted: {} } },
+    });
+  });
+
+  it('does not overwrite existing converted data when a later transformation fails', async () => {
+    const { repository, service } = setup();
+    await service.createPoint({
+      name: '缓存保护点位',
+      system: 'WGS84',
+      first: 121.4737,
+      second: 31.2304,
+    });
+    const firstTransformation = await service.transformPoint(pointId, 'GCJ02');
+    expect(firstTransformation.status).toBe('success');
+    if (firstTransformation.status !== 'success') return;
+    const cachedGcj02 = firstTransformation.value.coordinates.converted.GCJ02;
+
+    const failedTransformation = await service.transformPoint(pointId, 'CGCS2000');
+
+    expect(failedTransformation).toMatchObject({
+      status: 'failure',
+      error: { code: 'UNSUPPORTED_TRANSFORMATION' },
+    });
+    const stored = await repository.get(pointId);
+    expect(stored.status).toBe('success');
+    if (stored.status === 'success' && stored.value) {
+      expect(stored.value.coordinates.converted.GCJ02).toEqual(cachedGcj02);
+      expect(stored.value.coordinates.converted.CGCS2000).toBeUndefined();
+    }
+  });
 });

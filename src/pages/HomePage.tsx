@@ -6,19 +6,23 @@ export function HomePage() {
     <div className="home-page">
       <section className="home-hero">
         <div className="home-hero__content">
+          <div className="home-hero__brand">
+            <img className="home-hero__logo" src="/brand/logo-512.png" alt="地图工具" />
+            <strong>地图工具</strong>
+          </div>
           <div className="product-pill">
             <span className="product-pill__dot" />
             浏览器本地运行 · 数据不上传
           </div>
-          <p className="eyebrow">PeachTools · Spatial Utilities</p>
+          <p className="eyebrow">点位坐标与地图验证</p>
           <h1>设备点位坐标转换与地图验证工作台</h1>
           <p className="home-hero__lead">
             将分散的设备点位统一整理、按需转换，并在高德、百度与天地图中快速核对位置。
-            一个专注点位验证的轻量工具，而不是复杂 GIS 平台。
+            一个专注点位验证的轻量工具，而不是复杂的地理信息平台。
           </p>
           <div className="home-hero__actions">
             <Link className="button button--primary" to="/points">
-              打开 Point Manager
+              打开点位管理
               <ToolIcon name="arrow" />
             </Link>
             <Link className="button button--quiet" to="/map/amap">
@@ -40,7 +44,7 @@ export function HomePage() {
 
         <div className="coordinate-preview" aria-label="点位转换流程预览">
           <div className="coordinate-preview__top">
-            <span className="coordinate-preview__label">POINT · PT-240701</span>
+            <span className="coordinate-preview__label">点位 · 示例 01</span>
             <span className="status-dot">已就绪</span>
           </div>
           <div className="coordinate-preview__point">
@@ -48,8 +52,8 @@ export function HomePage() {
               <ToolIcon name="target" size={22} />
             </span>
             <div>
-              <strong>浦东机房 A-01</strong>
-              <small>Excel 导入 · 今天 10:32</small>
+              <strong>设备点位 01</strong>
+              <small>表格导入 · 今天 10:32</small>
             </div>
           </div>
           <div className="coordinate-preview__route">
@@ -79,7 +83,7 @@ export function HomePage() {
       <section className="home-section">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">CORE CAPABILITIES</p>
+            <p className="eyebrow">核心能力</p>
             <h2>把点位工作集中在一条清晰路径上</h2>
           </div>
           <p>从数据进入到地图核对，每一步都保留明确的坐标语义与来源。</p>
@@ -121,7 +125,7 @@ export function HomePage() {
 
       <section className="workflow-section">
         <div className="workflow-section__intro">
-          <p className="eyebrow eyebrow--light">WORKFLOW</p>
+          <p className="eyebrow eyebrow--light">使用流程</p>
           <h2>三步完成一次点位验证</h2>
           <p>流程简单，但每一步都保留专业空间数据所需的清晰边界。</p>
         </div>
@@ -130,7 +134,7 @@ export function HomePage() {
             <span>1</span>
             <div>
               <strong>导入数据</strong>
-              <small>Excel · CSV · JSON · 手动</small>
+              <small>表格文件 · 文本文件 · 手动</small>
             </div>
           </li>
           <li>
@@ -153,7 +157,7 @@ export function HomePage() {
       <section className="home-section home-section--platforms">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">MAP WORKSPACES</p>
+            <p className="eyebrow">地图验证入口</p>
             <h2>选择地图平台开始验证</h2>
           </div>
           <p>三个平台保持一致的操作结构，凭据与坐标要求各自独立。</p>
@@ -161,31 +165,32 @@ export function HomePage() {
         <div className="platform-grid">
           {[
             {
-              code: 'AM',
+              code: '高',
               name: '高德地图',
               path: '/map/amap',
               system: 'GCJ02',
-              credential: 'Key',
+              credential: '密钥',
               tone: 'amber',
             },
             {
-              code: 'BM',
+              code: '百',
               name: '百度地图',
               path: '/map/baidu',
               system: 'BD09',
-              credential: 'AK',
+              credential: '访问密钥',
               tone: 'blue',
             },
             {
-              code: 'TD',
+              code: '天',
               name: '天地图',
               path: '/map/tianditu',
-              system: 'WGS84 / CGCS2000',
-              credential: 'Token',
+              system: 'WGS84',
+              credential: '访问令牌',
               tone: 'green',
             },
           ].map((platform) => (
             <Link
+              aria-label={`进入${platform.name}验证`}
               className={`platform-card platform-card--${platform.tone}`}
               key={platform.name}
               to={platform.path}
@@ -199,6 +204,135 @@ export function HomePage() {
               </span>
               <ToolIcon name="arrow" />
             </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-section home-section--resources">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">地图平台</p>
+            <h2>地图平台与开发资料</h2>
+          </div>
+          <p>查看平台地图和开发文档，核对坐标要求、申请访问凭据。</p>
+        </div>
+        <div className="resource-grid resource-grid--platforms">
+          {[
+            {
+              icon: '/resource-icons/amap.ico',
+              name: '高德地图',
+              description: 'GCJ02坐标验证',
+              tone: 'amber',
+              website: 'https://www.amap.com/',
+              documentation: 'https://lbs.amap.com/api/javascript-api-v2/summary',
+            },
+            {
+              icon: '/resource-icons/baidu-map.ico',
+              name: '百度地图',
+              description: 'BD09坐标验证',
+              tone: 'blue',
+              website: 'https://map.baidu.com/',
+              documentation: 'https://lbsyun.baidu.com/docs/jsapi?title=jspopularGL/index',
+            },
+            {
+              icon: '/resource-icons/tianditu.ico',
+              name: '天地图',
+              description: 'WGS84坐标验证',
+              tone: 'green',
+              website: 'https://www.tianditu.gov.cn/',
+              documentation: 'https://lbs.tianditu.gov.cn/api/js4.0/class.html',
+            },
+          ].map((platform) => (
+            <article
+              className={`resource-card resource-card--${platform.tone}`}
+              key={platform.name}
+            >
+              <div className="resource-card__heading">
+                <span className="resource-card__mark">
+                  <img alt="" aria-hidden="true" src={platform.icon} />
+                </span>
+                <div>
+                  <h3>{platform.name}</h3>
+                  <p>{platform.description}</p>
+                </div>
+              </div>
+              <div className="resource-card__actions">
+                <a
+                  aria-label={`访问${platform.name}官网`}
+                  href={platform.website}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  官网
+                  <ToolIcon name="arrow" size={14} />
+                </a>
+                <a
+                  aria-label={`查看${platform.name}开发文档`}
+                  href={platform.documentation}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  开发文档
+                  <ToolIcon name="arrow" size={14} />
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-section home-section--reference-resources">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">参考资源</p>
+            <h2>地理信息参考资源</h2>
+          </div>
+          <p>用于查询坐标参考系、检查空间数据和开展桌面地图处理。</p>
+        </div>
+        <div className="resource-grid resource-grid--references">
+          {[
+            {
+              icon: '/resource-icons/epsg.ico',
+              name: 'EPSG.io',
+              description: '查询全球坐标参考系与投影定义',
+              href: 'https://epsg.io/',
+            },
+            {
+              icon: '/resource-icons/qgis.ico',
+              name: 'QGIS',
+              description: '开源桌面地理信息处理软件',
+              href: 'https://qgis.org/',
+            },
+            {
+              icon: '/resource-icons/geojson.ico',
+              name: 'GeoJSON.io',
+              description: '在线查看和编辑地理空间数据',
+              href: 'https://geojson.io/',
+            },
+            {
+              icon: '/resource-icons/tianditu.ico',
+              name: '国家地理信息公共服务平台',
+              description: '国家级权威在线地理信息公共服务',
+              href: 'https://www.tianditu.gov.cn/',
+            },
+          ].map((resource) => (
+            <a
+              aria-label={`访问${resource.name}`}
+              className="reference-card"
+              href={resource.href}
+              key={resource.name}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span className="reference-card__mark">
+                <img alt="" aria-hidden="true" src={resource.icon} />
+              </span>
+              <span>
+                <strong>{resource.name}</strong>
+                <small>{resource.description}</small>
+              </span>
+              <ToolIcon name="arrow" />
+            </a>
           ))}
         </div>
       </section>

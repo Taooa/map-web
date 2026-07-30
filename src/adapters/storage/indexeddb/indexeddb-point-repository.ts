@@ -1,0 +1,167 @@
+import type { Point, PointId } from '@/domain';
+import type {
+  PointListQuery,
+  PointRepository,
+  RepositoryError,
+  RepositoryResult,
+} from '@/adapters/storage/repositories';
+import {
+  IndexedDbClient,
+  POINT_STORE_NAME,
+  requestToPromise,
+  transactionToPromise,
+} from './indexeddb-client';
+
+function success<Value>(value: Value): RepositoryResult<Value> {
+  return { status: 'success', value };
+}
+
+function errorCode(error: unknown): RepositoryError['code'] {
+  if (error instanceof DOMException) {
+    if (error.name === 'ConstraintError') return 'CONFLICT';
+    if (error.name === 'QuotaExceededError') return 'QUOTA_EXCEEDED';
+  }
+  return 'UNAVAILABLE';
+}
+
+function failure(message: string, error: unknown): RepositoryResult<never> {
+  return {
+    status: 'failure',
+    error: { code: errorCode(error), message, cause: error },
+  };
+}
+
+function sameOriginal(left: Point, right: Point): boolean {
+  return JSON.stringify(left.coordinates.original) === JSON.stringify(right.coordinates.original);
+}
+
+export class IndexedDBPointRepository implements PointRepository {
+  readonly #client: IndexedDbClient;
+
+  constructor(client = new IndexedDbClient()) {
+    this.#client = client;
+  }
+
+  async initialize(): Promise<RepositoryResult<void>> {
+    try {
+      await this.#client.open();
+      return success(undefined);
+    } catch (error) {
+      return failure('无法打开点位数据库。', error);
+    }
+  }
+
+  async get(id: PointId): Promise<RepositoryResult<Point | null>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readonly');
+      const point = await requestToPromise(
+        transaction.objectStore(POINT_STORE_NAME).get(id) as IDBRequest<Point | undefined>,
+      );
+      await transactionToPromise(transaction);
+      return success(point ?? null);
+    } catch (error) {
+      return failure('读取点位失败。', error);
+    }
+  }
+
+  async list(query?: PointListQuery): Promise<RepositoryResult<readonly Point[]>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readonly');
+      const points = await requestToPromise(
+        transaction.objectStore(POINT_STORE_NAME).getAll() as IDBRequest<Point[]>,
+      );
+      await transactionToPromise(transaction);
+
+      const search = query?.search?.trim().toLocaleLowerCase();
+      const matching = points
+        .filter((point) => !search || point.name.toLocaleLowerCase().includes(search))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      const offset = Math.max(0, query?.offset ?? 0);
+      const end = query?.limit === undefined ? undefined : offset + Math.max(0, query.limit);
+      return success(matching.slice(offset, end));
+    } catch (error) {
+      return failure('读取点位列表失败。', error);
+    }
+  }
+
+  async create(point: Point): Promise<RepositoryResult<Point>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readwrite');
+      transaction.objectStore(POINT_STORE_NAME).add(point);
+      await transactionToPromise(transaction);
+      return success(point);
+    } catch (error) {
+      return failure('创建点位失败。', error);
+    }
+  }
+
+  async createMany(points: readonly Point[]): Promise<RepositoryResult<readonly Point[]>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(POINT_STORE_NAME);
+      points.forEach((point) => store.add(point));
+      await transactionToPromise(transaction);
+      return success(points);
+    } catch (error) {
+      return failure('批量创建点位失败。', error);
+    }
+  }
+
+  async update(point: Point): Promise<RepositoryResult<Point>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(POINT_STORE_NAME);
+      const existing = await requestToPromise(store.get(point.id) as IDBRequest<Point | undefined>);
+      if (!existing) {
+        transaction.abort();
+        return {
+          status: 'failure',
+          error: { code: 'NOT_FOUND', message: `Point ${point.id} does not exist.` },
+        };
+      }
+      if (!sameOriginal(existing, point)) {
+        transaction.abort();
+        return {
+          status: 'failure',
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'IndexedDBPointRepository cannot overwrite original coordinates.',
+          },
+        };
+      }
+
+      store.put(point);
+      await transactionToPromise(transaction);
+      return success(point);
+    } catch (error) {
+      return failure('更新点位失败。', error);
+    }
+  }
+
+  async delete(id: PointId): Promise<RepositoryResult<void>> {
+    try {
+      const database = await this.#client.open();
+      const transaction = database.transaction(POINT_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(POINT_STORE_NAME);
+      const existingKey = await requestToPromise(store.getKey(id));
+      if (existingKey === undefined) {
+        transaction.abort();
+        return {
+          status: 'failure',
+          error: { code: 'NOT_FOUND', message: `Point ${id} does not exist.` },
+        };
+      }
+
+      store.delete(id);
+      await transactionToPromise(transaction);
+      return success(undefined);
+    } catch (error) {
+      return failure('删除点位失败。', error);
+    }
+  }
+}

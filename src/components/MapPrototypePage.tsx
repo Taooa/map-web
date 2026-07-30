@@ -27,7 +27,7 @@ export function MapPrototypePage({
           <div className="map-platform-title">
             <span className="map-platform-title__mark">{shortName}</span>
             <div>
-              <p className="eyebrow">MAP VALIDATION</p>
+              <p className="eyebrow">地图验证</p>
               <h1>{title}</h1>
             </div>
           </div>
@@ -59,7 +59,7 @@ export function MapPrototypePage({
               选择点位
             </button>
             <div className="selected-points">
-              {['浦东机房 A-01', '虹桥网关 B-12', '徐汇传感器 C-07'].map((name, index) => (
+              {['设备点位 01', '虹桥网关 12', '徐汇传感器 07'].map((name, index) => (
                 <div className="selected-point" key={name}>
                   <span className="selected-point__number">{index + 1}</span>
                   <div>
@@ -110,7 +110,7 @@ export function MapPrototypePage({
             <i />
             本地工作区
           </span>
-          <span>UI Prototype</span>
+          <span>页面原型</span>
         </footer>
       </aside>
 
@@ -123,7 +123,7 @@ export function MapPrototypePage({
           <span className="fake-map__road fake-map__road--two" />
           <span className="fake-map__road fake-map__road--three" />
           {[
-            ['浦东机房', '64%', '42%'],
+            ['设备点位', '64%', '42%'],
             ['虹桥网关', '27%', '58%'],
             ['徐汇传感器', '43%', '72%'],
           ].map(([label, left, top], index) => (
@@ -172,7 +172,7 @@ export function MapPrototypePage({
             {coordinateSystem}
           </span>
           <span>已选择 3 个点位</span>
-          <span>地图 SDK 未接入</span>
+          <span>地图服务未接入</span>
         </div>
       </section>
 
@@ -188,7 +188,7 @@ export function MapPrototypePage({
             <span className="prototype-dialog__icon">
               <ToolIcon name={dialog === 'key' ? 'key' : 'target'} size={22} />
             </span>
-            <p className="eyebrow">INTERACTION PLACEHOLDER</p>
+            <p className="eyebrow">交互占位</p>
             <h2 id="map-dialog-title">
               {dialog === 'key' ? `配置 ${title} ${credentialName}` : '选择地图点位'}
             </h2>

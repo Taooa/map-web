@@ -1,14 +1,15 @@
 import type { ImportRecordId } from '../shared';
 
-export type ImportedPointSourceType = 'excel' | 'csv' | 'json-file' | 'json-paste';
-export type PointSourceType = 'manual' | ImportedPointSourceType;
+export type ImportFormat = 'excel' | 'csv' | 'json-file' | 'json-paste';
+export type PointSourceType = 'manual' | 'import';
 
 export interface ManualPointSource {
   readonly type: 'manual';
 }
 
 export interface ImportedPointSource {
-  readonly type: ImportedPointSourceType;
+  readonly type: 'import';
+  readonly format: ImportFormat;
   readonly importId: ImportRecordId;
   /**
    * One-based source row when a row concept exists. This is trace metadata,
