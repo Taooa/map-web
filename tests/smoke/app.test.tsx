@@ -7,7 +7,7 @@ describe('application shell', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: '设备点位坐标转换与地图验证工作台',
+        name: '设备点位坐标转换与地图展示工作台',
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import type { ExcelSheetData } from '@/adapters/files/excel-parser';
 import type { ImportRecordId, Point } from '@/domain';
+import type { ImportFormat } from '@/domain';
 import {
   mapExcelRowsToPointInputs,
   type ExcelFieldMapping,
@@ -12,6 +13,11 @@ export interface ImportExcelSheetInput {
   readonly sheet: ExcelSheetData;
   readonly mapping: ExcelFieldMapping;
   readonly system: ExcelImportCoordinateSystem;
+}
+
+export interface ImportTableInput extends ImportExcelSheetInput {
+  readonly format: ImportFormat;
+  readonly sourceName?: string;
 }
 
 export interface ExcelImportSummary {
@@ -37,11 +43,17 @@ export class ImportService {
   }
 
   async importExcelSheet(input: ImportExcelSheetInput): Promise<ExcelImportSummary> {
+    return this.importTable({ ...input, format: 'excel' });
+  }
+
+  async importTable(input: ImportTableInput): Promise<ExcelImportSummary> {
     const mapped = mapExcelRowsToPointInputs(
       input.sheet,
       input.mapping,
       input.system,
       this.#createImportId(),
+      input.format,
+      input.sourceName,
     );
     const creationResults = await this.#pointService.createPoints(
       mapped.candidates.map((candidate) => candidate.input),

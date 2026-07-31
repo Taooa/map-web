@@ -9,7 +9,7 @@ export function AppLayout() {
           <img className="app-brand__logo" src="/brand/logo-192.png" alt="地图工具" />
           <span className="app-brand__text">
             <span className="app-brand__name">地图工具</span>
-            <small>点位坐标转换与地图验证</small>
+            <small>点位坐标转换与地图展示</small>
           </span>
         </NavLink>
 

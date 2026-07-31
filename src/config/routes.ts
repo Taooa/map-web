@@ -6,7 +6,7 @@ export interface NavigationItem {
 export const appNavigation: readonly NavigationItem[] = [
   { label: '首页', path: '/' },
   { label: '点位管理', path: '/points' },
-  { label: '地图验证', path: '/map' },
+  { label: '地图展示', path: '/map' },
 ];
 
 export const mapNavigation: readonly NavigationItem[] = [

@@ -17,9 +17,24 @@ type Platform = 'amap' | 'baidu' | 'tianditu';
 type Status = 'missing-credential' | 'loading' | 'ready' | 'error';
 
 const platforms = {
-  amap: { name: '高德地图', coordinate: 'GCJ02', credential: '密钥', storage: 'coordinate-toolkit.amap-key' },
-  baidu: { name: '百度地图', coordinate: 'BD09', credential: '访问密钥', storage: 'coordinate-toolkit.baidu-ak' },
-  tianditu: { name: '天地图', coordinate: 'WGS84', credential: '访问令牌', storage: 'coordinate-toolkit.tianditu-token' },
+  amap: {
+    name: '高德地图',
+    coordinate: 'GCJ02',
+    credential: '密钥',
+    storage: 'coordinate-toolkit.amap-key',
+  },
+  baidu: {
+    name: '百度地图',
+    coordinate: 'BD09',
+    credential: '访问密钥',
+    storage: 'coordinate-toolkit.baidu-ak',
+  },
+  tianditu: {
+    name: '天地图',
+    coordinate: 'WGS84',
+    credential: '访问令牌',
+    storage: 'coordinate-toolkit.tianditu-token',
+  },
 } as const;
 
 function isPlatform(value: string | null): value is Platform {
@@ -107,11 +122,13 @@ export function MapWorkspacePage() {
     const selected = new Set(selectedIds);
     const markers: MapRenderPoint[] = [];
     const missing: Point[] = [];
-    points.filter((point) => selected.has(point.id)).forEach((point) => {
-      const marker = toRenderPoint(platform, point);
-      if (marker) markers.push(marker);
-      else missing.push(point);
-    });
+    points
+      .filter((point) => selected.has(point.id))
+      .forEach((point) => {
+        const marker = toRenderPoint(platform, point);
+        if (marker) markers.push(marker);
+        else missing.push(point);
+      });
     return { markers, missing };
   }, [platform, points, selectedIds]);
 
@@ -142,8 +159,6 @@ export function MapWorkspacePage() {
     <div className={`unified-map-workspace unified-map-workspace--${platform}`}>
       <aside className="unified-map-panel">
         <header>
-          <p className="eyebrow">地图验证工作台</p>
-          <h1>{config.name}</h1>
           <div className="unified-platform-switch" role="tablist" aria-label="地图平台切换">
             {(Object.keys(platforms) as Platform[]).map((item) => (
               <button
@@ -161,19 +176,42 @@ export function MapWorkspacePage() {
         </header>
 
         <section className="unified-point-tools">
-          <div className="map-control-section__title"><span>点位选择</span><small>{selectedIds.length} / {points.length}</small></div>
-          <input aria-label="搜索点位" onChange={(event) => setQuery(event.target.value)} placeholder="搜索点位名称" type="search" value={query} />
+          <div className="map-control-section__title">
+            <span>点位选择</span>
+            <small>
+              {selectedIds.length} / {points.length}
+            </small>
+          </div>
+          <input
+            aria-label="搜索点位"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索点位名称"
+            type="search"
+            value={query}
+          />
           <div className="unified-point-actions">
-            <button onClick={() => setSelectedIds(points.map((point) => point.id))} type="button">显示全部点位</button>
-            <button onClick={clearMap} type="button">清空地图</button>
-            <button onClick={() => adapterRef.current?.fitView()} type="button">查看全部标记</button>
+            <button onClick={() => setSelectedIds(points.map((point) => point.id))} type="button">
+              显示全部点位
+            </button>
+            <button onClick={clearMap} type="button">
+              清空地图
+            </button>
+            <button onClick={() => adapterRef.current?.fitView()} type="button">
+              查看全部标记
+            </button>
           </div>
           <div className="unified-point-list">
             {filteredPoints.map((point) => (
               <label key={point.id}>
                 <input
                   checked={selectedIds.includes(point.id)}
-                  onChange={() => setSelectedIds((current) => current.includes(point.id) ? current.filter((id) => id !== point.id) : [...current, point.id])}
+                  onChange={() =>
+                    setSelectedIds((current) =>
+                      current.includes(point.id)
+                        ? current.filter((id) => id !== point.id)
+                        : [...current, point.id],
+                    )
+                  }
                   type="checkbox"
                 />
                 <span>{point.name}</span>
@@ -185,27 +223,103 @@ export function MapWorkspacePage() {
 
         <section className="unified-credential">
           <span>{credential ? `${config.credential}已配置` : `${config.credential}未配置`}</span>
-          <button onClick={() => setCredentialDialog(true)} type="button">配置{config.credential}</button>
+          <button onClick={() => setCredentialDialog(true)} type="button">
+            配置{config.credential}
+          </button>
         </section>
 
         {platform === 'amap' && <AMapToolbar />}
         {platform === 'baidu' && <BaiduToolbar />}
         {platform === 'tianditu' && <TiandituToolbar />}
-        {(message ?? missingCoordinateMessage) && <div className="map-inline-warning" role="alert">{message ?? missingCoordinateMessage}</div>}
+        {(message ?? missingCoordinateMessage) && (
+          <div className="map-inline-warning" role="alert">
+            {message ?? missingCoordinateMessage}
+          </div>
+        )}
       </aside>
 
       <section className="unified-map-canvas" aria-label={`${config.name}区域`}>
         <div className="unified-map-container" ref={containerRef} />
-        {displayedStatus !== 'ready' && <div className="map-missing-card"><div><span className="status-label">{displayedStatus === 'loading' ? '正在加载地图' : displayedStatus === 'error' ? '地图加载失败' : '尚未加载地图'}</span><h2>{credential ? `${config.name}暂不可用` : `请先配置${config.credential}`}</h2><p>{message ?? `配置${config.credential}后只加载当前地图平台。`}</p></div></div>}
+        {displayedStatus !== 'ready' && (
+          <div className="map-missing-card">
+            <div>
+              <span className="status-label">
+                {displayedStatus === 'loading'
+                  ? '正在加载地图'
+                  : displayedStatus === 'error'
+                    ? '地图加载失败'
+                    : '尚未加载地图'}
+              </span>
+              <h2>{credential ? `${config.name}暂不可用` : `请先配置${config.credential}`}</h2>
+              <p>{message ?? `配置${config.credential}后只加载当前地图平台。`}</p>
+            </div>
+          </div>
+        )}
       </section>
 
-      {credentialDialog && <CredentialDialog label={config.credential} initialValue={credential} onCancel={() => setCredentialDialog(false)} onSave={(value) => { localStorage.setItem(config.storage, value); setCredentials((current) => ({ ...current, [platform]: value })); setCredentialDialog(false); }} />}
+      {credentialDialog && (
+        <CredentialDialog
+          label={config.credential}
+          initialValue={credential}
+          onCancel={() => setCredentialDialog(false)}
+          onSave={(value) => {
+            localStorage.setItem(config.storage, value);
+            setCredentials((current) => ({ ...current, [platform]: value }));
+            setCredentialDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function CredentialDialog({ label, initialValue, onCancel, onSave }: { label: string; initialValue: string; onCancel: () => void; onSave: (value: string) => void }) {
+function CredentialDialog({
+  label,
+  initialValue,
+  onCancel,
+  onSave,
+}: {
+  label: string;
+  initialValue: string;
+  onCancel: () => void;
+  onSave: (value: string) => void;
+}) {
   const [value, setValue] = useState(initialValue);
-  function submit(event: FormEvent) { event.preventDefault(); if (value.trim()) onSave(value.trim()); }
-  return <div className="overlay overlay--center" onMouseDown={onCancel}><section aria-label={`配置${label}`} aria-modal="true" className="prototype-dialog map-dialog" onMouseDown={(event) => event.stopPropagation()} role="dialog"><h2>配置{label}</h2><form onSubmit={submit}><label className="form-field"><span>{label}</span><input autoFocus onChange={(event) => setValue(event.target.value)} required type="password" value={value} /></label><div className="prototype-dialog__actions"><button onClick={onCancel} type="button">取消</button><button disabled={!value.trim()} type="submit">保存并加载</button></div></form></section></div>;
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (value.trim()) onSave(value.trim());
+  }
+  return (
+    <div className="overlay overlay--center" onMouseDown={onCancel}>
+      <section
+        aria-label={`配置${label}`}
+        aria-modal="true"
+        className="prototype-dialog map-dialog"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <h2>配置{label}</h2>
+        <form onSubmit={submit}>
+          <label className="form-field">
+            <span>{label}</span>
+            <input
+              autoFocus
+              onChange={(event) => setValue(event.target.value)}
+              required
+              type="password"
+              value={value}
+            />
+          </label>
+          <div className="prototype-dialog__actions">
+            <button onClick={onCancel} type="button">
+              取消
+            </button>
+            <button disabled={!value.trim()} type="submit">
+              保存并加载
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }

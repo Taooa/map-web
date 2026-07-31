@@ -27,7 +27,7 @@ export function MapPrototypePage({
           <div className="map-platform-title">
             <span className="map-platform-title__mark">{shortName}</span>
             <div>
-              <p className="eyebrow">地图验证</p>
+              <p className="eyebrow">地图展示</p>
               <h1>{title}</h1>
             </div>
           </div>

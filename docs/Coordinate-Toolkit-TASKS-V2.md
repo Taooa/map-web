@@ -3,8 +3,8 @@
 > 对应 PRD：[`Coordinate-Toolkit-PRD-V2.md`](./Coordinate-Toolkit-PRD-V2.md)  
 > 设计规范：[`DESIGN-SYSTEM.md`](./DESIGN-SYSTEM.md)  
 > 参考分析：[`REFERENCE-ANALYSIS.md`](./REFERENCE-ANALYSIS.md)  
-> 状态：Draft  
-> 更新日期：2026-07-28
+> 状态：执行中（按当前代码同步）
+> 更新日期：2026-07-31
 
 ## 0. 任务定位
 
@@ -67,6 +67,141 @@
 | Phase 5 | 地图核心架构 |
 | Phase 6 | 地图页面实现 |
 | Phase 7 | UI优化和性能优化 |
+
+---
+
+## 0.5 当前执行看板（2026-07-31）
+
+本看板覆盖后文最初的“从迁移到实现”任务顺序，是当前继续开发时的优先依据。
+
+### 已完成
+
+| 模块 | 当前结果 |
+| --- | --- |
+| 工程与UI | React/TypeScript/Vite、中文界面、PeachTools风格、首页与点位页面 |
+| Point | 真实新增、列表、搜索、详情、单个删除，`original/converted`分离 |
+| 坐标转换 | gcoord 0.3.2基线，WGS84/GCJ02/BD09单点转换和缓存 |
+| Excel导入 | `.xlsx`解析、多Sheet选择、字段映射、坐标系选择、结果统计 |
+| 存储 | IndexedDB points store，失败时降级MemoryPointRepository |
+| 地图工作台 | `/map?platform=`单页切换高德、百度、天地图 |
+| 地图平台 | 独立Loader、Adapter、Toolbar、Marker、InfoWindow和销毁流程 |
+| 地图安全 | 异步失效Adapter阻止幽灵实例，Marker事件显式解绑 |
+| 自动化 | 97项测试通过，覆盖100/1000/5000点生命周期及JSON粘贴页面闭环 |
+
+### 本轮产品调整
+
+- 对外名称统一为“地图工具”；
+- `Point Manager`统一为“点位管理”；
+- 主导航和首页主文案由“地图验证”调整为“地图展示”；
+- 首页删除重复的地图平台入口模块；
+- GIS资源区删除与地图平台区重复的天地图资源卡；
+- 地图不再拆成三个产品页面，改为一个工作台切换三个独立平台实现。
+
+### 本轮新增完成
+
+- 用户可见文案统一使用“地图展示”“点位管理”；
+- 首页、Smoke和旧地图地址路由测试已同步；
+- CSV支持中文表头、引号、转义引号、空值和字段映射；
+- JSON文件与JSON粘贴只接受顶层对象数组；
+- Excel、CSV、JSON复用坐标系选择、字段映射、行校验和Point批量创建；
+- 导入来源可区分Excel、CSV、JSON文件和JSON粘贴；
+- 无关JSON字段不会进入Point数据模型。
+
+### 接下来必须完成（P0）
+
+#### N-01 完成中文文案和测试同步
+
+**状态：已完成**
+
+**目标**
+
+消除“地图验证/地图展示”和旧英文名称混用，保证当前用户改动可以稳定合入。
+
+**输入**
+
+- 当前 Git 改动；
+- PRD V2；
+- 页面与路由测试。
+
+**输出**
+
+- 页面、导航、测试和文档统一使用“地图展示”“点位管理”；
+- 首页不再出现重复地图入口；
+- 旧路由兼容行为保持。
+
+**修改文件**
+
+- `src/pages/HomePage.tsx`
+- `src/pages/PointsPage.tsx`
+- `src/app/layouts/AppLayout.tsx`
+- `src/config/routes.ts`
+- `tests/pages/prototype-pages.test.tsx`
+- `tests/smoke/app.test.tsx`
+
+**验收标准**
+
+- 用户可见页面不再出现无必要英文；
+- 不存在产品层面的“地图验证/地图展示”混用；
+- 更新首页测试，不再要求已删除的独立地图平台入口；
+- 更新地图路由测试，以平台切换标签和当前平台状态作为断言，不依赖已删除的页面标题；
+- Build、TypeScript、Lint和测试全部通过。
+
+#### N-02 让平台专属设置真正控制地图
+
+**目标**
+
+当前三个 Toolbar 已保存和恢复轻量设置，但尚未驱动实际 SDK。下一步在各平台目录内完成设置应用，不扩张公共 `MapAdapter`。
+
+**输出**
+
+- 高德：标准/卫星底图、路况开关生效；
+- 百度：底图和平台控件开关生效；
+- 天地图：矢量/影像/地形及注记设置生效；
+- 切换平台或刷新后恢复设置并重新应用。
+
+**修改文件**
+
+- `src/adapters/maps/amap/*`
+- `src/adapters/maps/baidu/*`
+- `src/adapters/maps/tianditu/*`
+- `src/pages/maps/MapWorkspacePage.tsx`
+- 对应地图测试。
+
+**验收标准**
+
+- 平台专属能力不进入公共 `MapAdapter`；
+- 设置变化立即作用于当前地图；
+- `destroy`后不遗留图层、控件和监听器；
+- 设置恢复有自动化测试和真实SDK回归。
+
+### V1闭环缺口（P1）
+
+| 优先级 | 任务 | 验收结果 |
+| --- | --- | --- |
+| P1-03 | 批量坐标转换 | 支持WGS84/GCJ02/BD09，统计成功、失败和缓存命中 |
+| P1-04 | 点位编辑 | 名称可编辑；原始坐标变更时按规则失效converted |
+| P1-05 | 批量删除 | 只删除明确选中的点位，并提供确认和结果反馈 |
+| P1-06 | 地图点位体验 | 大量点位时避免左侧列表一次渲染全部项目 |
+
+### 上线前任务（P2）
+
+| 优先级 | 任务 | 说明 |
+| --- | --- | --- |
+| P2-01 | 上海2000验证 | 确认参数、EPSG/投影、轴序、样本和精度后再启用转换 |
+| P2-02 | 大量Marker策略 | 根据真实设备规模决定聚合、分片、上限提示或抽样 |
+| P2-03 | DevTools内存回归 | 强制GC后检查Detached DOM、SDK内部监听器和闭包 |
+| P2-04 | 浏览器导航回归 | 手工验证前进、后退、刷新、旧地址重定向和设置恢复 |
+| P2-05 | 凭据管理完善 | 支持清除凭据、重新加载和域名白名单提示 |
+| P2-06 | 发布验收 | Chrome/Edge真实闭环、空状态、失败状态、键盘和响应式检查 |
+
+### 暂不进入V1
+
+- CGCS2000普通用户入口；
+- GeoJSON；
+- 自动识别坐标系；
+- 异常点判断与区域校验；
+- 通用GIS Layer、Geometry或插件框架；
+- 后端、账号和跨设备同步。
 
 ---
 
@@ -281,11 +416,11 @@
 
 **目标**
 
-形成首页、Point Manager 和三个地图页的产品信息架构。
+形成首页、点位管理和单一地图展示工作台的产品信息架构。
 
 **已有输入**
 
-- 旧项目四路由经验；
+- 旧项目多路由经验；
 - PRD V2 页面结构；
 - PeachTools 布局规范。
 
@@ -293,9 +428,10 @@
 
 - `/`
 - `/points`
-- `/map/amap`
-- `/map/baidu`
-- `/map/tianditu`
+- `/map?platform=amap`
+- `/map?platform=baidu`
+- `/map?platform=tianditu`
+- 旧地图地址兼容重定向
 - 全局导航与 404
 
 **修改文件**
@@ -306,9 +442,9 @@
 
 **验收标准**
 
-- 五个路由可直接访问和刷新；
-- 三地图保持独立页面；
-- 坐标转换不再作为孤立核心页，而进入 Point Manager；
+- 首页、点位管理和三个地图查询参数入口可直接访问和刷新；
+- 三个平台共用工作台外壳，但保持独立 Adapter、Toolbar 和生命周期；
+- 坐标转换不再作为孤立核心页，而进入点位管理；
 - 首页不是后台 Dashboard。
 
 ## P1-03 接入 PeachTools Design System
@@ -1039,42 +1175,42 @@ MapCore
 
 ---
 
-# Phase 6：地图页面实现
+# Phase 6：地图工作台与平台实现
 
-## P6-01 实现通用地图页面壳
+## P6-01 实现地图工作台公共外壳
 
 **目标**
 
-统一三地图的 Sidebar、点位选择、设置和状态。
+统一三个平台的页面布局、平台切换、点位选择、搜索、清空、fitView和凭据入口。
 
 **已有输入**
 
 - 旧 MapVisual 左右布局；
 - PeachTools Design System；
-- MapAdapterFactory；
+- 最小 MapAdapter；
 - PointRepository。
 
 **输出**
 
-- MapPageShell；
-- MapSidebar；
-- PointPickerDialog；
+- MapWorkspacePage；
+- 平台切换；
+- 点位搜索与选择；
 - missing-key/loading/error/partial 状态。
 
 **修改文件**
 
+- `src/pages/maps/MapWorkspacePage.tsx`
 - `src/features/map-validation/*`
-- 三个地图页面壳
+- `src/adapters/maps/map-adapter.ts`
 
 **验收标准**
 
-- 三地图布局一致；
+- 三个平台共用同一工作台外壳；
 - 搜索、单选、多选、全选当前结果正确；
-- 取消弹窗不提交临时选择；
 - 无 Key 时不加载 SDK；
 - Sidebar保留点位文字信息。
 
-## P6-02 实现高德地图页面
+## P6-02 实现高德平台组件
 
 **目标**
 
@@ -1089,13 +1225,13 @@ MapCore
 
 **输出**
 
-- `/map/amap`；
+- `/map?platform=amap`；
 - Marker、InfoWindow、fit view；
 - 支持的有限底图。
 
 **修改文件**
 
-- `src/pages/AMapPage.tsx`
+- `src/pages/maps/MapWorkspacePage.tsx`
 - `src/adapters/maps/amap/*`
 - 集成测试
 
@@ -1107,7 +1243,7 @@ MapCore
 - 页面退出释放实例；
 - 不自动带入天气、POI、绘制等非V1功能。
 
-## P6-03 实现百度地图页面
+## P6-03 实现百度平台组件
 
 **目标**
 
@@ -1122,13 +1258,13 @@ MapCore
 
 **输出**
 
-- `/map/baidu`；
+- `/map?platform=baidu`；
 - Marker、InfoWindow、fit view；
 - 有限底图。
 
 **修改文件**
 
-- `src/pages/BaiduMapPage.tsx`
+- `src/pages/maps/MapWorkspacePage.tsx`
 - `src/adapters/maps/baidu/*`
 - 集成测试
 
@@ -1140,7 +1276,7 @@ MapCore
 - 退出后Overlay和事件释放；
 - 加载失败可重试或打开设置。
 
-## P6-04 实现天地图页面
+## P6-04 实现天地图平台组件
 
 **目标**
 
@@ -1155,13 +1291,13 @@ MapCore
 
 **输出**
 
-- `/map/tianditu`；
+- `/map?platform=tianditu`；
 - Marker、InfoWindow、fit view；
 - 矢量/影像/地形等确认后的底图。
 
 **修改文件**
 
-- `src/pages/TiandituMapPage.tsx`
+- `src/pages/maps/MapWorkspacePage.tsx`
 - `src/adapters/maps/tianditu/*`
 - 集成测试
 
@@ -1173,7 +1309,7 @@ MapCore
 - 图层和Overlay正确释放；
 - CGCS2000未确认时不伪装为用户正式入口。
 
-## P6-05 打通 Point Manager 到地图
+## P6-05 打通点位管理到地图
 
 **目标**
 
@@ -1181,9 +1317,9 @@ MapCore
 
 **已有输入**
 
-- Point Manager选择；
+- 点位管理选择；
 - prepareMapPoints；
-- 三地图路由。
+- 地图平台查询参数。
 
 **输出**
 
@@ -1196,7 +1332,7 @@ MapCore
 
 - `src/features/points/MapViewDialog.tsx`
 - `src/features/map-validation/mapSelectionStore.ts`
-- Point Manager和地图页集成
+- 点位管理和地图工作台集成
 
 **验收标准**
 
@@ -1427,4 +1563,3 @@ MapCore
 - 未引入V1排除功能；
 - 未为了抽象牺牲可读性和简单性；
 - 文档与实际行为同步。
-

@@ -1,21 +1,28 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
   type FormEvent,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ExcelWorkbookData } from '@/adapters/files/excel-parser';
 import { ToolIcon } from '@/components/ToolIcon';
-import type { Coordinate, CoordinateSystemId, Point, PointId } from '@/domain';
+import type { Coordinate, CoordinateSystemId, ImportFormat, Point, PointId } from '@/domain';
 import type {
   ExcelFieldMapping,
   ExcelImportCoordinateSystem,
 } from '@/features/import/excel-importer';
+import { importService, type ExcelImportSummary } from '@/features/import/import-service';
+import { fullCoordinateText } from '@/features/points/point-coordinate-display';
+import { PointTable } from '@/features/points/PointTable';
 import {
-  importService,
-  type ExcelImportSummary,
-} from '@/features/import/import-service';
+  getPageCount,
+  paginateItems,
+  pointPageSizes,
+  type PointPageSize,
+} from '@/features/points/point-list-model';
 import {
   getPointStorageStatus,
   pointService,
@@ -60,16 +67,21 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function formatPointSource(point: Point): { label: string; detail: string } {
-  return point.source.type === 'manual'
-    ? { label: '手动添加', detail: '点位管理' }
-    : {
-        label: '表格导入',
-        detail: point.source.sourceRow ? `源文件第 ${point.source.sourceRow} 行` : '批量导入',
-      };
+function formatPointSource(point: Point): string {
+  if (point.source.type === 'manual') return '手动新增';
+  if (point.source.format === 'json-paste') return 'JSON 粘贴';
+  if (point.source.sourceName) return point.source.sourceName;
+  const labels: Record<ImportFormat, string> = {
+    excel: 'Excel 文件',
+    csv: 'CSV 文件',
+    'json-file': 'JSON 文件',
+    'json-paste': 'JSON 粘贴',
+  };
+  return labels[point.source.format];
 }
 
 export function PointsPage() {
+  const navigate = useNavigate();
   const storageStatus = useSyncExternalStore(
     subscribePointStorageStatus,
     getPointStorageStatus,
@@ -86,17 +98,33 @@ export function PointsPage() {
   const [transformTarget, setTransformTarget] = useState<TransformSystem>('GCJ02');
   const [transformError, setTransformError] = useState<string | null>(null);
   const [transforming, setTransforming] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PointPageSize>(20);
+  const [selectedIds, setSelectedIds] = useState<Set<PointId>>(() => new Set());
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const [showBatchTransform, setShowBatchTransform] = useState(false);
+  const [batchTarget, setBatchTarget] = useState<TransformSystem>('GCJ02');
+  const [editingPoint, setEditingPoint] = useState<Point | null>(null);
+
+  const paginated = useMemo(() => paginateItems(points, page, pageSize), [page, pageSize, points]);
 
   const loadPoints = useCallback(async (search = '') => {
     setLoading(true);
     const result = await pointService.listPoints(search);
     if (result.status === 'success') {
       setPoints(result.value);
+      setPage((current) =>
+        Math.min(current, getPageCount(result.value.length, pageSize)),
+      );
+      if (!search) {
+        const existing = new Set(result.value.map((point) => point.id));
+        setSelectedIds((current) => new Set([...current].filter((id) => existing.has(id))));
+      }
     } else {
       setFeedback(result.error.message);
     }
     setLoading(false);
-  }, []);
+  }, [pageSize]);
 
   useEffect(() => {
     let active = true;
@@ -125,7 +153,7 @@ export function PointsPage() {
   async function handleImported(summary: ExcelImportSummary) {
     setQuery('');
     await loadPoints();
-    setFeedback(`表格导入完成：成功 ${summary.successCount} 条，失败 ${summary.failureCount} 条。`);
+    setFeedback(`导入完成：成功 ${summary.successCount} 条，失败 ${summary.failureCount} 条。`);
   }
 
   async function handleDelete(id: PointId) {
@@ -136,19 +164,99 @@ export function PointsPage() {
     }
 
     setActivePoint(null);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
     setShowDeleteConfirm(false);
     await loadPoints(query);
     setFeedback('点位已删除。');
   }
 
-  function openPointDetails(point: Point) {
-    const [firstTarget] = getTransformTargets(point);
-    setActivePoint(point);
-    setShowDeleteConfirm(false);
-    setTransformError(null);
-    if (firstTarget) {
-      setTransformTarget(firstTarget);
+  function togglePoint(id: PointId) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleCurrentPage(selected: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      paginated.items.forEach((point) => {
+        if (selected) next.add(point.id);
+        else next.delete(point.id);
+      });
+      return next;
+    });
+  }
+
+  async function copyCoordinate(point: Point, system: EntrySystem) {
+    const text = fullCoordinateText(point, system);
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setFeedback(`已复制 ${point.name} 的 ${system === 'SHANGHAI2000' ? 'SH2000' : system} 坐标。`);
+  }
+
+  async function handleBatchDelete() {
+    for (const id of selectedIds) await pointService.deletePoint(id);
+    setSelectedIds(new Set());
+    setShowBatchDeleteConfirm(false);
+    await loadPoints(query);
+    setFeedback('已删除所选点位。');
+  }
+
+  async function handleBatchTransform() {
+    let successCount = 0;
+    let skippedCount = 0;
+    let failureCount = 0;
+    for (const id of selectedIds) {
+      const pointResult = await pointService.getPoint(id);
+      if (pointResult.status === 'failure' || !pointResult.value) {
+        failureCount += 1;
+        continue;
+      }
+      const point = pointResult.value;
+      if (
+        point.coordinates.original.system === batchTarget ||
+        point.coordinates.converted[batchTarget]
+      ) {
+        skippedCount += 1;
+        continue;
+      }
+      const result = await pointService.transformPoint(point.id, batchTarget);
+      if (result.status === 'success') successCount += 1;
+      else failureCount += 1;
     }
+    setShowBatchTransform(false);
+    await loadPoints(query);
+    setFeedback(`坐标转换完成：新增 ${successCount}，跳过 ${skippedCount}，失败 ${failureCount}。`);
+  }
+
+  function viewSelectedOnMap() {
+    const params = new URLSearchParams({
+      platform: 'amap',
+      pointIds: [...selectedIds].join(','),
+    });
+    void navigate(`/map?${params.toString()}`);
+  }
+
+  async function exportSelected() {
+    const selected: Point[] = [];
+    for (const id of selectedIds) {
+      const result = await pointService.getPoint(id);
+      if (result.status === 'success' && result.value) selected.push(result.value);
+    }
+    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '点位导出.json';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleTransform() {
@@ -175,7 +283,7 @@ export function PointsPage() {
         <div>
           <p className="eyebrow">点位工作台</p>
           <h1>点位管理</h1>
-          <p>集中管理设备点位、坐标状态与地图验证入口。</p>
+          <p>集中管理设备点位、坐标状态与地图展示入口。</p>
         </div>
         <div className="workspace-header__actions">
           <button
@@ -187,12 +295,21 @@ export function PointsPage() {
             导入点位
           </button>
           <button
-            className="button button--primary"
+            className="button button--secondary"
             onClick={() => setShowAddDialog(true)}
             type="button"
           >
             <ToolIcon name="plus" />
             新增点位
+          </button>
+          <button
+            className="button button--primary"
+            disabled={selectedIds.size === 0}
+            onClick={() => setShowBatchTransform(true)}
+            type="button"
+          >
+            <ToolIcon name="transform" />
+            坐标转换
           </button>
         </div>
       </header>
@@ -206,9 +323,7 @@ export function PointsPage() {
         <ToolIcon name="database" size={17} />
         <span>
           <strong>
-            {storageStatus.mode === 'indexeddb'
-              ? 'IndexedDB 持久化已启用'
-              : '当前使用内存数据'}
+            {storageStatus.mode === 'indexeddb' ? 'IndexedDB 持久化已启用' : '当前使用内存数据'}
           </strong>
           {storageStatus.message}
         </span>
@@ -225,6 +340,7 @@ export function PointsPage() {
               onChange={(event) => {
                 const search = event.target.value;
                 setQuery(search);
+                setPage(1);
                 void loadPoints(search);
               }}
               placeholder="搜索点位名称"
@@ -235,105 +351,57 @@ export function PointsPage() {
           </label>
           <div className="data-toolbar__summary">
             <span>
-              当前结果 <strong>{points.length}</strong> 个点位
+              点位总数 <strong>{paginated.total}</strong>
+            </span>
+            <span className={selectedIds.size ? 'selection-count is-active' : 'selection-count'}>
+              已选择 {selectedIds.size} 个点位
             </span>
           </div>
           <div className="data-toolbar__actions">
-            <button className="button button--small button--quiet" disabled>
-              <ToolIcon name="transform" size={16} />
-              坐标转换
-            </button>
-            <button className="button button--small button--quiet" disabled>
+            <button
+              className="button button--small button--quiet"
+              disabled={selectedIds.size === 0}
+              onClick={viewSelectedOnMap}
+              type="button"
+            >
               <ToolIcon name="map" size={16} />
-              地图查看
+              在地图中查看
+            </button>
+            <button
+              className="button button--small button--quiet"
+              disabled={selectedIds.size === 0}
+              onClick={() => void exportSelected()}
+              type="button"
+            >
+              批量导出
+            </button>
+            <button
+              className="button button--small button--danger"
+              disabled={selectedIds.size === 0}
+              onClick={() => setShowBatchDeleteConfirm(true)}
+              type="button"
+            >
+              批量删除
             </button>
           </div>
         </div>
 
         <div className="table-scroll">
           {points.length > 0 && (
-            <table className="point-table">
-              <thead>
-                <tr>
-                  <th>点位名称</th>
-                  <th>来源</th>
-                  <th>原始坐标</th>
-                  <th>转换结果</th>
-                  <th>更新时间</th>
-                  <th aria-label="操作" />
-                </tr>
-              </thead>
-              <tbody>
-                {points.map((point) => {
-                  const label = systemLabels[point.coordinates.original.system as EntrySystem];
-                  const convertedSystems = Object.keys(point.coordinates.converted);
-                  const source = formatPointSource(point);
-
-                  return (
-                    <tr key={point.id}>
-                      <td>
-                        <button
-                          className="point-name"
-                          onClick={() => openPointDetails(point)}
-                          type="button"
-                        >
-                          <span className="point-name__marker">
-                            <ToolIcon name="target" size={15} />
-                          </span>
-                          <span>
-                            <strong>{point.name}</strong>
-                            <small>{point.id}</small>
-                          </span>
-                        </button>
-                      </td>
-                      <td>
-                        <span className="source-cell">
-                          <strong>{source.label}</strong>
-                          <small>{source.detail}</small>
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`coordinate-badge coordinate-badge--${label}`}>
-                          {label}
-                          <small>原始</small>
-                        </span>
-                        <code className="coordinate-value">{formatCoordinate(point)}</code>
-                      </td>
-                      <td>
-                        {convertedSystems.length ? (
-                          <div className="badge-row">
-                            {convertedSystems.map((system) => (
-                              <span
-                                className={`coordinate-badge coordinate-badge--${system}`}
-                                key={system}
-                              >
-                                {system}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="empty-value">尚未生成</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="updated-cell">{formatDate(point.updatedAt)}</span>
-                      </td>
-                      <td>
-                        <button
-                          aria-label={`查看 ${point.name} 详情`}
-                          className="row-action"
-                          onClick={() => openPointDetails(point)}
-                          type="button"
-                        >
-                          查看
-                          <ToolIcon name="chevron" size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <PointTable
+              formatDate={formatDate}
+              onCopy={(point, system) => void copyCoordinate(point, system)}
+              onDelete={(point) => {
+                setActivePoint(point);
+                setShowDeleteConfirm(true);
+              }}
+              onEdit={setEditingPoint}
+              onToggle={togglePoint}
+              onTogglePage={toggleCurrentPage}
+              result={paginated}
+              selectedIds={selectedIds}
+              sourceName={formatPointSource}
+            />
           )}
 
           {!loading && points.length === 0 && (
@@ -364,19 +432,54 @@ export function PointsPage() {
         </div>
 
         <footer className="table-pagination">
-          <span>当前显示 {points.length} 条内存数据</span>
+          <span>
+            共 {paginated.total} 条，第 {paginated.page} / {getPageCount(paginated.total, pageSize)} 页
+          </span>
           <div>
-            <button disabled type="button">
+            <button
+              disabled={paginated.page <= 1}
+              onClick={() => setPage((current) => current - 1)}
+              type="button"
+            >
               上一页
             </button>
-            <button className="is-current" type="button">
-              1
-            </button>
-            <button disabled type="button">
+            {Array.from(
+              { length: getPageCount(paginated.total, pageSize) },
+              (_, index) => index + 1,
+            ).map((pageNumber) => (
+              <button
+                aria-label={`第 ${pageNumber} 页`}
+                className={pageNumber === paginated.page ? 'is-current' : ''}
+                key={pageNumber}
+                onClick={() => setPage(pageNumber)}
+                type="button"
+              >
+                {pageNumber}
+              </button>
+            ))}
+            <button
+              disabled={paginated.page >= getPageCount(paginated.total, pageSize)}
+              onClick={() => setPage((current) => current + 1)}
+              type="button"
+            >
               下一页
             </button>
           </div>
-          <span className="pagination-placeholder">分页将在数据量增加后启用</span>
+          <label>
+            每页
+            <select
+              aria-label="每页条数"
+              onChange={(event) => {
+                setPageSize(Number(event.target.value) as PointPageSize);
+                setPage(1);
+              }}
+              value={pageSize}
+            >
+              {pointPageSizes.map((size) => (
+                <option key={size} value={size}>{size} 条</option>
+              ))}
+            </select>
+          </label>
         </footer>
       </section>
 
@@ -411,7 +514,7 @@ export function PointsPage() {
                 <div>
                   <strong>{activePoint.id}</strong>
                   <small>
-                    {formatPointSource(activePoint).label} · {formatDate(activePoint.updatedAt)}
+                    {formatPointSource(activePoint)} · {formatDate(activePoint.updatedAt)}
                   </small>
                 </div>
               </div>
@@ -447,9 +550,7 @@ export function PointsPage() {
                             {system}
                             <small>转换</small>
                           </span>
-                          <span className="status-dot">
-                            {formatDate(converted.transformedAt)}
-                          </span>
+                          <span className="status-dot">{formatDate(converted.transformedAt)}</span>
                         </div>
                         <code>{formatCoordinateValue(converted.coordinate)}</code>
                         <small className="algorithm-version">
@@ -555,11 +656,99 @@ export function PointsPage() {
       )}
 
       {showImportDialog && (
-        <ExcelImportDialog
+        <PointImportDialog
           onCancel={() => setShowImportDialog(false)}
           onImported={(summary) => void handleImported(summary)}
         />
       )}
+
+      {editingPoint && (
+        <EditPointDialog
+          point={editingPoint}
+          onCancel={() => setEditingPoint(null)}
+          onSaved={(point) => {
+            setEditingPoint(null);
+            void loadPoints(query).then(() => {
+              setFeedback(`已更新“${point.name}”。`);
+            });
+          }}
+        />
+      )}
+
+      {showBatchTransform && (
+        <div className="overlay overlay--center">
+          <section aria-label="批量坐标转换" aria-modal="true" className="point-form-dialog compact-dialog" role="dialog">
+            <header className="point-form-dialog__header">
+              <div><p className="eyebrow">批量操作</p><h2>批量坐标转换</h2></div>
+            </header>
+            <div className="point-form-dialog__body">
+              <p>将为已选择的 {selectedIds.size} 个点位补齐缺失结果，已有结果不会覆盖。</p>
+              <label className="form-field">
+                <span>目标坐标系</span>
+                <select aria-label="批量转换目标坐标系" onChange={(event) => setBatchTarget(event.target.value as TransformSystem)} value={batchTarget}>
+                  {transformSystems.map((system) => <option key={system} value={system}>{system}</option>)}
+                </select>
+              </label>
+            </div>
+            <footer className="point-form-dialog__footer">
+              <button className="button button--quiet" onClick={() => setShowBatchTransform(false)} type="button">取消</button>
+              <button className="button button--primary" onClick={() => void handleBatchTransform()} type="button">开始转换</button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {showBatchDeleteConfirm && (
+        <div className="overlay overlay--center">
+          <section aria-label="确认批量删除" aria-modal="true" className="point-form-dialog compact-dialog" role="dialog">
+            <header className="point-form-dialog__header">
+              <div><p className="eyebrow">危险操作</p><h2>确认删除 {selectedIds.size} 个点位？</h2></div>
+            </header>
+            <div className="point-form-dialog__body"><p>删除后无法恢复，请确认选择范围。</p></div>
+            <footer className="point-form-dialog__footer">
+              <button className="button button--quiet" onClick={() => setShowBatchDeleteConfirm(false)} type="button">取消</button>
+              <button className="button button--danger" onClick={() => void handleBatchDelete()} type="button">确认批量删除</button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditPointDialog({
+  point,
+  onCancel,
+  onSaved,
+}: {
+  point: Point;
+  onCancel: () => void;
+  onSaved: (point: Point) => void;
+}) {
+  const [name, setName] = useState(point.name);
+  const [error, setError] = useState<string | null>(null);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const result = await pointService.updatePointName(point.id, name);
+    if (result.status === 'failure') setError(result.error.message);
+    else onSaved(result.value);
+  }
+  return (
+    <div className="overlay overlay--center">
+      <section aria-label="编辑点位" aria-modal="true" className="point-form-dialog compact-dialog" role="dialog">
+        <header className="point-form-dialog__header"><div><p className="eyebrow">点位操作</p><h2>编辑点位</h2></div></header>
+        <form onSubmit={(event) => void submit(event)}>
+          <div className="point-form-dialog__body">
+            {error && <div className="form-error" role="alert">{error}</div>}
+            <label className="form-field"><span>点位名称</span><input aria-label="编辑点位名称" onChange={(event) => setName(event.target.value)} value={name} /></label>
+            <small>本轮编辑只修改名称，原始坐标和转换缓存保持不变。</small>
+          </div>
+          <footer className="point-form-dialog__footer">
+            <button className="button button--quiet" onClick={onCancel} type="button">取消</button>
+            <button className="button button--primary" disabled={!name.trim()} type="submit">保存修改</button>
+          </footer>
+        </form>
+      </section>
     </div>
   );
 }
@@ -697,7 +886,7 @@ function AddPointDialog({ onCancel, onCreated }: AddPointDialogProps) {
   );
 }
 
-interface ExcelImportDialogProps {
+interface PointImportDialogProps {
   readonly onCancel: () => void;
   readonly onImported: (summary: ExcelImportSummary) => void;
 }
@@ -708,7 +897,10 @@ const defaultMapping: ExcelFieldMapping = {
   latitudeColumn: 2,
 };
 
-function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
+type ImportMode = 'excel' | 'csv' | 'json-file' | 'json-paste';
+
+function PointImportDialog({ onCancel, onImported }: PointImportDialogProps) {
+  const [mode, setMode] = useState<ImportMode>('excel');
   const [workbook, setWorkbook] = useState<ExcelWorkbookData | null>(null);
   const [sheetName, setSheetName] = useState('');
   const [mapping, setMapping] = useState<ExcelFieldMapping>(defaultMapping);
@@ -717,17 +909,49 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<ExcelImportSummary | null>(null);
+  const [jsonText, setJsonText] = useState('');
 
   const selectedSheet =
     workbook?.sheets.find((sheet) => sheet.name === sheetName) ?? workbook?.sheets[0] ?? null;
+
+  function loadSingleSheet(sheet: ExcelWorkbookData['sheets'][number], name: string) {
+    setFileName(name);
+    setWorkbook({ sheets: [sheet] });
+    setSheetName(sheet.name);
+    setMapping(defaultMapping);
+  }
 
   async function handleFile(file: File | undefined) {
     setError(null);
     setSummary(null);
     setWorkbook(null);
     if (!file) return;
-    if (!file.name.toLocaleLowerCase().endsWith('.xlsx')) {
+    const lowerName = file.name.toLocaleLowerCase();
+    if (mode === 'excel' && !lowerName.endsWith('.xlsx')) {
       setError('请选择 .xlsx 文件。');
+      return;
+    }
+    if (mode === 'csv' && !lowerName.endsWith('.csv')) {
+      setError('请选择 .csv 文件。');
+      return;
+    }
+    if (mode === 'json-file' && !lowerName.endsWith('.json')) {
+      setError('请选择 .json 文件。');
+      return;
+    }
+
+    if (mode === 'csv') {
+      const { parseCsv } = await import('@/adapters/files/csv-parser');
+      const result = parseCsv(await file.text(), file.name);
+      if (result.status === 'failure') return setError(result.error.message);
+      loadSingleSheet(result.value, file.name);
+      return;
+    }
+    if (mode === 'json-file') {
+      const { parseJsonPoints } = await import('@/adapters/files/json-parser');
+      const result = parseJsonPoints(await file.text(), file.name);
+      if (result.status === 'failure') return setError(result.error.message);
+      loadSingleSheet(result.value, file.name);
       return;
     }
 
@@ -743,6 +967,27 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
     setWorkbook(result.value);
     setSheetName(firstSheet?.name ?? '');
     setMapping(defaultMapping);
+  }
+
+  async function handleJsonPaste() {
+    setError(null);
+    setSummary(null);
+    const { parseJsonPoints } = await import('@/adapters/files/json-parser');
+    const result = parseJsonPoints(jsonText, '粘贴的JSON');
+    if (result.status === 'failure') {
+      setError(result.error.message);
+      return;
+    }
+    loadSingleSheet(result.value, '粘贴的JSON');
+  }
+
+  function changeMode(next: ImportMode) {
+    setMode(next);
+    setWorkbook(null);
+    setSheetName('');
+    setFileName('');
+    setError(null);
+    setSummary(null);
   }
 
   function updateMapping(field: keyof ExcelFieldMapping, value: number) {
@@ -765,10 +1010,12 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
 
     setImporting(true);
     setError(null);
-    const result = await importService.importExcelSheet({
+    const result = await importService.importTable({
       sheet: selectedSheet,
       mapping,
       system,
+      format: mode,
+      ...(mode !== 'json-paste' && fileName ? { sourceName: fileName } : {}),
     });
     setImporting(false);
     setSummary(result);
@@ -778,7 +1025,7 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
   return (
     <div className="overlay overlay--center" onMouseDown={onCancel}>
       <section
-        aria-labelledby="excel-import-title"
+        aria-labelledby="point-import-title"
         aria-modal="true"
         className="point-form-dialog excel-import-dialog"
         onMouseDown={(event) => event.stopPropagation()}
@@ -786,11 +1033,16 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
       >
         <header className="point-form-dialog__header">
           <div>
-            <p className="eyebrow">表格导入</p>
-            <h2 id="excel-import-title">导入表格点位</h2>
-            <p>上传 .xlsx 文件，选择工作表并映射点位字段。</p>
+            <p className="eyebrow">批量导入</p>
+            <h2 id="point-import-title">导入点位</h2>
+            <p>支持 Excel、CSV、JSON 文件和 JSON 粘贴，确认字段后再写入点位列表。</p>
           </div>
-          <button aria-label="关闭表格导入" className="icon-button" onClick={onCancel} type="button">
+          <button
+            aria-label="关闭点位导入"
+            className="icon-button"
+            onClick={onCancel}
+            type="button"
+          >
             <ToolIcon name="close" />
           </button>
         </header>
@@ -804,35 +1056,88 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
 
           {!summary && (
             <>
-              <label className="form-field">
-                <span>表格文件</span>
-                <input
-                  accept=".xlsx"
-                  aria-label="表格文件"
-                  onChange={(event) => void handleFile(event.target.files?.[0])}
-                  type="file"
-                />
-                <small>{fileName || '第一版仅支持 .xlsx 文件。'}</small>
-              </label>
+              <div className="unified-platform-switch" role="tablist" aria-label="导入方式">
+                {(
+                  [
+                    ['excel', 'Excel'],
+                    ['csv', 'CSV'],
+                    ['json-file', 'JSON文件'],
+                    ['json-paste', 'JSON粘贴'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    aria-selected={mode === value}
+                    className={mode === value ? 'is-active' : ''}
+                    key={value}
+                    onClick={() => changeMode(value)}
+                    role="tab"
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {mode === 'json-paste' ? (
+                <label className="form-field">
+                  <span>JSON内容</span>
+                  <textarea
+                    aria-label="JSON内容"
+                    onChange={(event) => setJsonText(event.target.value)}
+                    placeholder={'[{"name":"设备1","lng":121.4,"lat":31.2}]'}
+                    rows={7}
+                    value={jsonText}
+                  />
+                  <button
+                    className="button button--secondary button--small"
+                    disabled={!jsonText.trim()}
+                    onClick={() => void handleJsonPaste()}
+                    type="button"
+                  >
+                    解析JSON
+                  </button>
+                </label>
+              ) : (
+                <label className="form-field">
+                  <span>
+                    {mode === 'excel' ? 'Excel文件' : mode === 'csv' ? 'CSV文件' : 'JSON文件'}
+                  </span>
+                  <input
+                    accept={
+                      mode === 'excel'
+                        ? '.xlsx'
+                        : mode === 'csv'
+                          ? '.csv,text/csv'
+                          : '.json,application/json'
+                    }
+                    aria-label="导入文件"
+                    onChange={(event) => void handleFile(event.target.files?.[0])}
+                    type="file"
+                  />
+                  <small>{fileName || '请选择对应格式的本地文件。'}</small>
+                </label>
+              )}
 
               {workbook && selectedSheet && (
                 <>
-                  <label className="form-field">
-                    <span>Sheet</span>
-                    <select
-                      onChange={(event) => {
-                        setSheetName(event.target.value);
-                        setMapping(defaultMapping);
-                      }}
-                      value={selectedSheet.name}
-                    >
-                      {workbook.sheets.map((sheet) => (
-                        <option key={sheet.name} value={sheet.name}>
-                          {sheet.name}（{sheet.rows.length} 行）
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {mode === 'excel' && (
+                    <label className="form-field">
+                      <span>Sheet</span>
+                      <select
+                        onChange={(event) => {
+                          setSheetName(event.target.value);
+                          setMapping(defaultMapping);
+                        }}
+                        value={selectedSheet.name}
+                      >
+                        {workbook.sheets.map((sheet) => (
+                          <option key={sheet.name} value={sheet.name}>
+                            {sheet.name}（{sheet.rows.length} 行）
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
                   <div className="excel-mapping-grid">
                     {[
@@ -874,7 +1179,7 @@ function ExcelImportDialog({ onCancel, onImported }: ExcelImportDialogProps) {
                       <option value="BD09">BD09</option>
                       <option value="SHANGHAI2000">上海2000（仅导入，不参与转换）</option>
                     </select>
-                    <small>一个文件中的当前 Sheet 统一使用同一坐标系。</small>
+                    <small>当前导入批次统一使用同一坐标系。</small>
                   </label>
                 </>
               )}

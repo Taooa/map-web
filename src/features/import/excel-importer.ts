@@ -1,5 +1,5 @@
 import type { ExcelSheetData } from '@/adapters/files/excel-parser';
-import type { CoordinateSystemId, ImportRecordId, PointSource } from '@/domain';
+import type { CoordinateSystemId, ImportFormat, ImportRecordId, PointSource } from '@/domain';
 import type { CreatePointInput } from '@/features/points';
 
 export type ExcelImportCoordinateSystem = Extract<
@@ -51,6 +51,8 @@ export function mapExcelRowsToPointInputs(
   mapping: ExcelFieldMapping,
   system: ExcelImportCoordinateSystem,
   importId: ImportRecordId,
+  format: ImportFormat = 'excel',
+  sourceName?: string,
 ): ExcelMappingResult {
   const candidates: ExcelPointCandidate[] = [];
   const failures: ExcelRowFailure[] = [];
@@ -72,8 +74,9 @@ export function mapExcelRowsToPointInputs(
 
     const source: PointSource = {
       type: 'import',
-      format: 'excel',
+      format,
       importId,
+      ...(sourceName ? { sourceName } : {}),
       sourceRow,
     };
     candidates.push({

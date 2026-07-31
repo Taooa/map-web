@@ -1152,6 +1152,88 @@ a {
   border-collapse: collapse;
 }
 
+.point-table--coordinates {
+  min-width: 1420px;
+}
+
+.point-table--coordinates .sticky-select,
+.point-table--coordinates .sticky-name,
+.point-table--coordinates .sticky-actions {
+  position: sticky;
+  z-index: 2;
+  background: #fff;
+}
+
+.point-table--coordinates thead .sticky-select,
+.point-table--coordinates thead .sticky-name,
+.point-table--coordinates thead .sticky-actions {
+  z-index: 3;
+  background: #f7fafb;
+}
+
+.point-table--coordinates .sticky-select {
+  left: 0;
+}
+
+.point-table--coordinates .sticky-name {
+  left: 44px;
+  min-width: 190px;
+  box-shadow: 1px 0 0 #e7eef2;
+}
+
+.point-table--coordinates .sticky-actions {
+  right: 0;
+  min-width: 112px;
+  box-shadow: -1px 0 0 #e7eef2;
+}
+
+.coordinate-table-cell {
+  min-width: 155px;
+}
+
+.coordinate-table-value {
+  display: inline-flex;
+  padding: 4px 6px;
+  flex-direction: column;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.coordinate-table-value:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.coordinate-empty {
+  color: var(--color-text-muted);
+}
+
+.point-table-name,
+.source-name {
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.row-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  font-size: 11px;
+}
+
 .point-table th,
 .point-table td {
   padding: 13px 14px;

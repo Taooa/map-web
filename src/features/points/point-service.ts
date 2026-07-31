@@ -43,6 +43,7 @@ export interface PointService {
   deletePoint(id: PointId): Promise<PointServiceResult<void>>;
   getPoint(id: PointId): Promise<PointServiceResult<Point | null>>;
   listPoints(search?: string): Promise<PointServiceResult<readonly Point[]>>;
+  updatePointName(id: PointId, name: string): Promise<PointServiceResult<Point>>;
   transformPoint(
     id: PointId,
     target: CoordinateSystemId,
@@ -178,6 +179,27 @@ export function createPointService(
       return result.status === 'success'
         ? success(result.value)
         : repositoryFailure('读取点位列表失败。');
+    },
+
+    async updatePointName(id, nextName) {
+      const name = nextName.trim();
+      if (!name) return failure({ code: 'EMPTY_NAME', message: '请输入点位名称。', pointId: id });
+      const pointResult = await repository.get(id);
+      if (pointResult.status === 'failure' || !pointResult.value) {
+        return repositoryFailure('未找到需要编辑的点位。', id);
+      }
+      const updateResult = await repository.update({
+        ...pointResult.value,
+        name,
+        updatedAt: now(),
+      });
+      return updateResult.status === 'success'
+        ? success(updateResult.value)
+        : failure({
+            code: 'REPOSITORY_FAILURE',
+            message: updateResult.error.message,
+            pointId: id,
+          });
     },
 
     async transformPoint(id, target) {

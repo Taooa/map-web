@@ -11,6 +11,8 @@ export interface ImportedPointSource {
   readonly type: 'import';
   readonly format: ImportFormat;
   readonly importId: ImportRecordId;
+  /** User-visible file name only. Never store the local path. */
+  readonly sourceName?: string;
   /**
    * One-based source row when a row concept exists. This is trace metadata,
    * not a copy of the original source record.
