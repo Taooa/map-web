@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { App as AntdApp, ConfigProvider, theme, type ThemeConfig } from 'antd';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
 import zhCN from 'antd/locale/zh_CN';
+
+dayjs.locale('zh-cn');
 
 function isDarkTheme(): boolean {
   return document.documentElement.dataset.theme === 'dark';

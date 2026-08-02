@@ -10,3 +10,17 @@ coverage/
 .env.*
 !.env.example
 reference/
+
+# Editor and local tooling
+.vscode/
+.idea/
+.codex/
+*.tsbuildinfo
+
+# Browser test artifacts
+playwright-report/
+test-results/
+
+# Windows metadata
+Thumbs.db
+Desktop.ini

@@ -79,6 +79,18 @@
 .points-antd-table-host .ant-table-cell {
   white-space: nowrap;
 }
+.points-antd-table-host .ant-table-body {
+  scrollbar-gutter: auto;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar:vertical {
+  width: 0;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar:horizontal {
+  height: 8px;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar-thumb:vertical {
+  background: transparent;
+}
 .points-antd-table-host .ant-table-thead > tr > th {
   padding-block: 11px;
   font-weight: 600;

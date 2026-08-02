@@ -196,6 +196,7 @@ export function PointsTable({
           loading={loading}
           onChange={handleChange}
           pagination={false}
+          tableLayout="fixed"
           rowKey="id"
           rowSelection={{
             preserveSelectedRowKeys: true,
@@ -219,7 +220,7 @@ export function PointsTable({
               onSelectionChange(next);
             },
           }}
-          scroll={{ x: 1540, y: bodyHeight }}
+          scroll={{ x: 1618, y: bodyHeight }}
           size="middle"
           sticky
         />

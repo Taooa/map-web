@@ -82,7 +82,14 @@ describe('Ant Design point management', () => {
 
     await user.click(screen.getByRole('button', { name: '新增点位' }));
     const addDialog = screen.getAllByRole('dialog').at(-1)!;
-    await user.type(within(addDialog).getByLabelText('点位名称 1'), '浦东机房 A-01');
+    const firstNameInput = within(addDialog).getByLabelText('点位名称 1');
+    expect(firstNameInput).toHaveAttribute('maxlength', '20');
+    expect(within(addDialog).getAllByRole('button', { name: '继续添加一行' })).toHaveLength(1);
+    await user.click(within(addDialog).getByRole('button', { name: '继续添加一行' }));
+    expect(within(addDialog).getAllByRole('button', { name: '继续添加一行' })).toHaveLength(1);
+    expect(within(addDialog).getByLabelText('点位名称 2')).toHaveAttribute('maxlength', '20');
+    await user.click(within(addDialog).getByRole('button', { name: '删除第 2 行' }));
+    await user.type(firstNameInput, '浦东机房 A-01');
     await user.type(within(addDialog).getByLabelText('坐标一 1'), '121.544379');
     await user.type(within(addDialog).getByLabelText('坐标二 1'), '31.221517');
     await user.click(within(addDialog).getByRole('button', { name: '确认新增' }));
@@ -105,7 +112,7 @@ describe('Ant Design point management', () => {
     await user.type(name, '浦东机房 A-02');
     await user.click(within(drawer).getByRole('button', { name: '保存' }));
     expect(await screen.findByText('浦东机房 A-02')).toBeVisible();
-  });
+  }, 25_000);
 
   it('imports pasted JSON through Ant Design tabs and field mapping', async () => {
     const user = userEvent.setup();
@@ -117,7 +124,7 @@ describe('Ant Design point management', () => {
       target: { value: '[{"name":"JSON设备一","lng":121.4,"lat":31.2}]' },
     });
     await user.click(screen.getByRole('button', { name: '解析并预览' }));
-    expect(screen.getByRole('combobox', { name: '点位名称字段' })).toBeVisible();
+    expect(await screen.findByRole('combobox', { name: '点位名称字段' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '确认导入' }));
     expect((await screen.findAllByText('JSON设备一')).length).toBeGreaterThan(0);
   });

@@ -10,6 +10,7 @@ import {
   Space,
   Table,
   Tabs,
+  Tooltip,
   Upload,
 } from 'antd';
 import { useState } from 'react';
@@ -171,9 +172,16 @@ function ManualPanel({ onChanged }: { readonly onChanged: (message: string) => v
               <Space align="start" className="points-antd-manual-row" key={field.key} wrap>
                 <Form.Item
                   name={[field.name, 'name']}
-                  rules={[{ required: true, whitespace: true, message: '请输入名称' }]}
+                  rules={[
+                    { required: true, whitespace: true, message: '请输入名称' },
+                    { max: 20, message: '点位名称最多20个字' },
+                  ]}
                 >
-                  <Input aria-label={`点位名称 ${index + 1}`} placeholder="点位名称" />
+                  <Input
+                    aria-label={`点位名称 ${index + 1}`}
+                    maxLength={20}
+                    placeholder="点位名称"
+                  />
                 </Form.Item>
                 <Form.Item
                   name={[field.name, 'first']}
@@ -201,12 +209,21 @@ function ManualPanel({ onChanged }: { readonly onChanged: (message: string) => v
                   disabled={fields.length === 1}
                   icon={<DeleteOutlined />}
                   onClick={() => remove(field.name)}
+                  shape="circle"
                 />
+                {index === fields.length - 1 && (
+                  <Tooltip title="继续添加一行">
+                    <Button
+                      aria-label="继续添加一行"
+                      icon={<PlusOutlined />}
+                      onClick={() => add()}
+                      shape="circle"
+                      type="dashed"
+                    />
+                  </Tooltip>
+                )}
               </Space>
             ))}
-            <Button block icon={<PlusOutlined />} onClick={() => add()} type="dashed">
-              继续添加一行
-            </Button>
           </div>
         )}
       </Form.List>
