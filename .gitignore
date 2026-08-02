@@ -1,0 +1,26 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.vite/
+.DS_Store
+*.local
+*.log
+.env
+.env.*
+!.env.example
+reference/
+
+# Editor and local tooling
+.vscode/
+.idea/
+.codex/
+*.tsbuildinfo
+
+# Browser test artifacts
+playwright-report/
+test-results/
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
