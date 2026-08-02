@@ -3,7 +3,7 @@ import { AppLayout } from '@/app/layouts/AppLayout';
 import { Navigate } from 'react-router-dom';
 import { HomePage } from '@/pages/HomePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { PointsPage } from '@/pages/PointsPage';
+import { PointsPageAntd } from '@/pages/PointsPageAntd';
 import { MapWorkspacePage } from '@/pages/maps/MapWorkspacePage';
 
 export const appRoutes: RouteObject[] = [
@@ -16,7 +16,7 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: 'points',
-        element: <PointsPage />,
+        element: <PointsPageAntd />,
       },
       {
         path: 'map',

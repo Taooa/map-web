@@ -94,8 +94,13 @@ export async function initializePointStorage(
 export { createPointService } from './point-service';
 export type {
   CreatePointInput,
+  CoordinateEditValue,
+  EditableCoordinateSystem,
+  BulkDeleteResult,
   PointService,
   PointServiceError,
   PointServiceErrorCode,
   PointServiceResult,
+  TransformPointsResult,
+  UpdatePointInput,
 } from './point-service';

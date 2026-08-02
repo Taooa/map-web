@@ -4,7 +4,7 @@ import type { PointSource } from './point-source';
 
 export interface PointCoordinates {
   /**
-   * Immutable user-provided or imported coordinate.
+   * User-provided or imported coordinate. Its system identity stays stable; edits go through PointService.
    */
   readonly original: Coordinate;
   /**

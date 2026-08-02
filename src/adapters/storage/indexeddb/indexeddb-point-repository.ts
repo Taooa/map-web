@@ -31,10 +31,6 @@ function failure(message: string, error: unknown): RepositoryResult<never> {
   };
 }
 
-function sameOriginal(left: Point, right: Point): boolean {
-  return JSON.stringify(left.coordinates.original) === JSON.stringify(right.coordinates.original);
-}
-
 export class IndexedDBPointRepository implements PointRepository {
   readonly #client: IndexedDbClient;
 
@@ -122,16 +118,6 @@ export class IndexedDBPointRepository implements PointRepository {
         return {
           status: 'failure',
           error: { code: 'NOT_FOUND', message: `Point ${point.id} does not exist.` },
-        };
-      }
-      if (!sameOriginal(existing, point)) {
-        transaction.abort();
-        return {
-          status: 'failure',
-          error: {
-            code: 'VALIDATION_FAILED',
-            message: 'IndexedDBPointRepository cannot overwrite original coordinates.',
-          },
         };
       }
 

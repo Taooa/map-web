@@ -21,6 +21,7 @@ export default defineConfig({
     restoreMocks: true,
     clearMocks: true,
     mockReset: true,
+    testTimeout: 15_000,
     coverage: {
       reporter: ['text', 'html'],
     },

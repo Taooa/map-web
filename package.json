@@ -20,6 +20,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.2",
+    "antd": "^6.5.3",
     "gcoord": "0.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",

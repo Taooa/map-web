@@ -60,15 +60,6 @@ export class MemoryPointRepository implements PointRepository {
       return Promise.resolve(failure('NOT_FOUND', `Point ${point.id} does not exist.`));
     }
 
-    if (existing.coordinates.original !== point.coordinates.original) {
-      return Promise.resolve(
-        failure(
-          'VALIDATION_FAILED',
-          'MemoryPointRepository cannot overwrite original coordinates.',
-        ),
-      );
-    }
-
     this.#points.set(point.id, point);
     return Promise.resolve(success(point));
   }

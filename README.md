@@ -1,48 +1,52 @@
-# Coordinate Toolkit
+# Coordinate Toolkit（地图工具）
 
-设备点位坐标转换与地图验证工作台。
-
-当前工程处于 **Phase 1 Batch A**：只包含 React 工程基础、应用布局、空壳路由和测试基础设施，不包含地图、点位、导入、坐标转换或本地存储功能。
+Coordinate Toolkit 是一个浏览器本地运行的设备点位管理、坐标转换与地图核验工作台。当前应用已具备点位录入/导入、本地持久化、WGS84/GCJ02/BD09 转换缓存，以及高德、百度、天地图统一工作台。
 
 ## 环境要求
 
-- Node.js 22.17.0 或更高的 Node 22版本
-- pnpm 11.17.0 或更高的 pnpm 11版本
-
-项目通过 `packageManager` 和 `.node-version` 固定工具链基线。
-
-如果系统未直接安装pnpm，可以使用Node自带的Corepack：
-
-```bash
-corepack enable
-corepack prepare pnpm@11.17.0 --activate
-```
-
-也可以在命令前使用 `corepack pnpm`。
-
-## 安装
+- Node.js `>=22.17.0`
+- pnpm `>=11.17.0`（项目固定为 `pnpm@11.17.0`）
 
 ```bash
 pnpm install
-```
-
-## 开发
-
-```bash
 pnpm dev
 ```
 
-启动后访问Vite输出的本地地址。
+## 页面
 
-## 可用路由
+- `/`：工具首页
+- `/points`：点位管理（Ant Design 查询、表格、分页、录入、导入、转换、导出和删除）
+- `/map?platform=amap`：高德地图工作台
+- `/map?platform=baidu`：百度地图工作台
+- `/map?platform=tianditu`：天地图工作台
 
-- `/`：首页空壳
-- `/points`：Point Manager空壳
-- `/map/amap`：高德地图页面空壳
-- `/map/baidu`：百度地图页面空壳
-- `/map/tianditu`：天地图页面空壳
+旧的 `/map/amap`、`/map/baidu`、`/map/tianditu` 地址会重定向到统一地图工作台。
 
-地图路由不会加载地图SDK，也不会读取API Key。
+## 核心规则
+
+- Point 的 `original` 保存原始输入，不允许被坐标转换覆盖；转换结果写入 `converted` 缓存。
+- 正式转换仅支持 WGS84、GCJ02、BD09。
+- 上海2000只能录入、保存和展示，当前不能生成正式转换结果。
+- CGCS2000 不开放用户入口。
+- 数据默认保存在浏览器 IndexedDB；初始化失败时降级为当前会话内存。
+- 项目不包含后端、账号系统、通用 GIS 框架或大型插件系统。
+
+## 目录边界
+
+```text
+src/
+├── app/        应用入口、Ant Design Provider、路由和布局
+├── pages/      页面组合层
+├── features/   点位、导入和地图展示用例
+├── services/   坐标服务
+├── domain/     Point、Coordinate 与共享领域类型
+├── adapters/   文件、存储、坐标和地图平台适配
+├── components/ 跨功能展示组件
+├── styles/     全局样式与设计 Token
+└── test/       测试初始化和渲染帮助
+```
+
+主要调用链保持为：`Page → Feature → Service → Repository → Adapter / Storage`。
 
 ## 质量检查
 
@@ -54,47 +58,10 @@ pnpm format:check
 pnpm test:run
 ```
 
-开发测试监听：
+## 开发约束
 
-```bash
-pnpm test
-```
-
-## 当前目录边界
-
-```text
-src/
-├── app/        应用入口、路由和布局
-├── pages/      页面组合与路由空壳
-├── components/ 跨Feature展示组件
-├── features/   用户用例（当前未实现）
-├── domain/     领域类型与规则（后续Batch）
-├── core/       坐标与地图核心契约（后续Batch）
-├── adapters/   地图、文件和存储适配（后续Phase）
-├── config/     路由等静态配置
-├── hooks/      通用React Hook
-├── styles/     全局基础样式
-├── test/       测试初始化和帮助函数
-└── utils/      无业务语义的纯工具
-```
-
-## 当前明确未实现
-
-- 地图SDK与地图Adapter
-- Marker、InfoWindow、fitView、聚合与海量点
-- API Key、AK、Token设置与存储
-- IndexedDB与localStorage
-- Point Domain模型与点位CRUD
-- Excel、CSV、JSON导入与字段映射
-- WGS84、GCJ02、BD09、上海2000和CGCS2000转换
-- 文件上传与导出
-- 完整首页、Point Manager和地图业务界面
-
-## 迁移边界
-
-`reference/map-tools` 和 `reference/gisviewer-react` 只用于能力与架构分析。新工程：
-
-- 不在运行时引用reference代码；
-- 不复制旧页面、CSS或状态管理；
-- 不修改reference项目；
-- 后续迁移必须遵守 `docs/decisions/ADR-005-legacy-code-boundary.md`。
+- 不修改 `reference/`，也不把旧项目代码直接复制回运行时工程。
+- 不恢复 TransformationGraph、AlgorithmRegistry、Map Provider Registry 或三个独立地图页面。
+- 公共 `MapAdapter` 只保留 `mount`、`setPoints`、`fitView`、`clear`、`destroy`；平台能力留在各自目录。
+- 不修改坐标算法、上海2000转换逻辑或 `Point.original` 数据结构，除非另行评审确认。
+- 设计与当前状态以 [docs/CURRENT-PROJECT-CONTEXT.md](docs/CURRENT-PROJECT-CONTEXT.md) 为准。

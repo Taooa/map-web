@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { appRoutes } from '@/app/router';
+import { AntdProvider } from '@/app/AntdProvider';
 
 export function renderRoute(path: string) {
   const router = createMemoryRouter(appRoutes, {
@@ -9,6 +10,10 @@ export function renderRoute(path: string) {
 
   return {
     router,
-    ...render(<RouterProvider router={router} />),
+    ...render(
+      <AntdProvider>
+        <RouterProvider router={router} />
+      </AntdProvider>,
+    ),
   };
 }

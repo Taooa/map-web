@@ -1,14 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb';
-import {
-  IndexedDbClient,
-  IndexedDBPointRepository,
-} from '@/adapters/storage';
+import { IndexedDbClient, IndexedDBPointRepository } from '@/adapters/storage';
 import type { IsoDateTime, Point, PointId } from '@/domain';
-import {
-  getPointStorageStatus,
-  initializePointStorage,
-  pointService,
-} from '@/features/points';
+import { getPointStorageStatus, initializePointStorage, pointService } from '@/features/points';
 
 const timestamp = '2026-07-29T10:00:00.000Z' as IsoDateTime;
 const transformedAt = '2026-07-29T10:05:00.000Z' as IsoDateTime;
@@ -68,7 +61,7 @@ describe('IndexedDBPointRepository', () => {
     await client.close();
   });
 
-  it('persists original and converted coordinates while preventing original overwrite', async () => {
+  it('persists original and converted coordinates including service-approved original edits', async () => {
     const { client, repository } = setup();
     const originalPoint = point();
     await repository.create(originalPoint);
@@ -109,11 +102,8 @@ describe('IndexedDBPointRepository', () => {
         },
       },
     };
-    expect(await repository.update(overwritten)).toMatchObject({
-      status: 'failure',
-      error: { code: 'VALIDATION_FAILED' },
-    });
-    expect(await repository.get(updated.id)).toEqual({ status: 'success', value: updated });
+    expect((await repository.update(overwritten)).status).toBe('success');
+    expect(await repository.get(updated.id)).toEqual({ status: 'success', value: overwritten });
     await client.close();
   });
 

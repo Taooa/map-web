@@ -1,11 +1,11 @@
 import { screen } from '@testing-library/react';
 import { renderRoute } from '@/test/render';
 
-describe.each([['/points', '点位管理']])('route %s', (path, heading) => {
-  it(`renders ${heading}`, async () => {
-    renderRoute(path);
+describe('route /points', () => {
+  it('renders the point list workspace', async () => {
+    renderRoute('/points');
 
-    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '点位查询与操作' })).toBeInTheDocument();
   });
 });
 

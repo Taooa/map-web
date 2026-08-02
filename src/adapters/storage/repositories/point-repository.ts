@@ -10,9 +10,8 @@ export interface PointListQuery {
 /**
  * Persistence port for Point entities.
  *
- * Implementations must preserve `coordinates.original` when updating a Point.
- * Storage transactions and concrete database types must not leak through this
- * interface.
+ * Coordinate validation and original-system identity are enforced by PointService.
+ * Storage transactions and concrete database types must not leak through this interface.
  */
 export interface PointRepository {
   get(id: PointId): Promise<RepositoryResult<Point | null>>;
