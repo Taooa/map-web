@@ -1,0 +1,245 @@
+.points-antd-page {
+  display: flex;
+  min-height: 560px;
+  padding: 16px clamp(12px, 2vw, 28px);
+  gap: 12px;
+  overflow: hidden;
+  background: var(--color-canvas);
+  flex-direction: column;
+}
+
+.points-antd-toolbar,
+.points-antd-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.points-antd-toolbar {
+  padding: 14px 18px;
+}
+
+.points-antd-query {
+  display: flex;
+  gap: 10px 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.points-antd-query .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.points-antd-query .ant-form-item-row {
+  display: flex;
+  align-items: center;
+  flex-flow: row nowrap;
+}
+.points-antd-query .ant-form-item-label {
+  overflow: visible;
+  padding: 0 8px 0 0;
+  text-align: left;
+  flex: none;
+}
+.points-antd-query .ant-form-item-control {
+  flex: none;
+}
+.points-antd-query-name .ant-input-affix-wrapper {
+  width: 150px;
+}
+.points-antd-query-source .ant-select {
+  width: 130px;
+}
+.points-antd-query-range .ant-picker {
+  width: 250px;
+}
+.points-antd-query-actions {
+  margin-left: auto !important;
+}
+
+.points-antd-list {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.points-antd-table-host {
+  min-height: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+.points-antd-table-host .ant-table-wrapper,
+.points-antd-table-host .ant-spin-nested-loading,
+.points-antd-table-host .ant-spin-container {
+  height: 100%;
+}
+.points-antd-table-host .ant-table-cell {
+  white-space: nowrap;
+}
+.points-antd-table-host .ant-table-body {
+  scrollbar-gutter: auto;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar:vertical {
+  width: 0;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar:horizontal {
+  height: 8px;
+}
+.points-antd-table-host .ant-table-body::-webkit-scrollbar-thumb:vertical {
+  background: transparent;
+}
+.points-antd-table-host .ant-table-thead > tr > th {
+  padding-block: 11px;
+  font-weight: 600;
+}
+.points-antd-table-host .ant-table-tbody > tr > td {
+  padding-block: 10px;
+}
+.points-antd-table-host .ant-table-tbody > tr:hover > td {
+  transition: background-color 120ms ease;
+}
+
+.points-antd-row-actions .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+.points-antd-row-actions .ant-btn:hover {
+  transform: translateY(-1px);
+}
+.points-antd-row-actions .ant-btn:not(.ant-btn-dangerous):hover {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.points-antd-coordinate {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 6px;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.points-antd-coordinate .ant-tag {
+  margin-inline-end: 0;
+}
+.points-antd-empty-coordinate {
+  color: var(--color-text-muted);
+}
+
+.points-antd-pagination {
+  display: flex;
+  min-height: 58px;
+  padding: 10px 16px;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.points-antd-coordinate-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.points-antd-coordinate-group {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-subtle);
+}
+
+.points-antd-coordinate-group h3 {
+  margin: 0 0 10px;
+  color: var(--color-text-soft);
+  font-size: 14px;
+}
+
+.points-antd-drawer-footer {
+  position: sticky;
+  bottom: -24px;
+  display: flex;
+  margin: 24px -24px -24px;
+  padding: 14px 24px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.points-antd-operation-form {
+  display: grid;
+  margin-top: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.points-antd-operation-result,
+.points-antd-import-mapping,
+.points-antd-import-panel,
+.points-antd-manual-rows {
+  display: flex;
+  margin-top: 16px;
+  gap: 14px;
+  flex-direction: column;
+}
+
+.points-antd-statistics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.points-antd-statistics .ant-statistic {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-subtle);
+}
+
+.points-antd-manual-row .ant-form-item {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1180px) {
+  .points-antd-query-actions {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .points-antd-page {
+    min-height: 680px;
+    padding: 10px;
+  }
+  .points-antd-query {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .points-antd-query .ant-form-item-row {
+    justify-content: space-between;
+  }
+  .points-antd-query-name .ant-input-affix-wrapper,
+  .points-antd-query-source .ant-select,
+  .points-antd-query-range .ant-picker {
+    width: min(250px, 68vw);
+  }
+  .points-antd-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .points-antd-coordinate-form,
+  .points-antd-operation-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .points-antd-pagination {
+    overflow-x: auto;
+  }
+}
