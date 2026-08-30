@@ -1,5 +1,20 @@
 import type { Point, PointId } from '@/domain';
-import type { PointListQuery, PointRepository, RepositoryError, RepositoryResult } from './index';
+import type { PointListPage, PointListQuery, PointRepository, RepositoryError, RepositoryResult } from './index';
+
+function sourceName(point: Point): string {
+  if (point.source.type === 'manual') return '手动输入';
+  return point.source.sourceName || ({ excel: 'Excel 导入', csv: 'CSV 导入', 'json-file': 'JSON 文件导入', 'json-paste': 'JSON 粘贴' } as const)[point.source.format];
+}
+
+function matches(point: Point, query: PointListQuery): boolean {
+  const search = query.search?.trim().toLocaleLowerCase();
+  return (!search || point.name.toLocaleLowerCase().includes(search)) &&
+    (!query.source || sourceName(point) === query.source) &&
+    (!query.createdFrom || point.createdAt >= query.createdFrom) &&
+    (!query.createdTo || point.createdAt <= query.createdTo) &&
+    (!query.updatedFrom || point.updatedAt >= query.updatedFrom) &&
+    (!query.updatedTo || point.updatedAt <= query.updatedTo);
+}
 
 function success<Value>(value: Value): RepositoryResult<Value> {
   return { status: 'success', value };
@@ -21,14 +36,32 @@ export class MemoryPointRepository implements PointRepository {
   }
 
   list(query?: PointListQuery): Promise<RepositoryResult<readonly Point[]>> {
-    const search = query?.search?.trim().toLocaleLowerCase();
     const matching = [...this.#points.values()]
-      .filter((point) => !search || point.name.toLocaleLowerCase().includes(search))
+      .filter((point) => matches(point, query ?? {}))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     const offset = Math.max(0, query?.offset ?? 0);
     const end = query?.limit === undefined ? undefined : offset + Math.max(0, query.limit);
 
     return Promise.resolve(success(matching.slice(offset, end)));
+  }
+
+  listPage(query: PointListQuery): Promise<RepositoryResult<PointListPage>> {
+    const field = query.sortField ?? 'updatedAt';
+    const direction = query.sortDirection ?? 'desc';
+    const all = [...this.#points.values()];
+    const sourceOptions = [...new Set(all.map(sourceName))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    const matching = all.filter((point) => matches(point, query)).sort((a, b) => {
+      const compared = a[field].localeCompare(b[field]) || a.id.localeCompare(b.id);
+      return direction === 'asc' ? compared : -compared;
+    });
+    const offset = Math.max(0, query.offset ?? 0);
+    const limit = Math.max(0, query.limit ?? 20);
+    return Promise.resolve(success({
+      points: matching.slice(offset, offset + limit),
+      pointIds: query.includePointIds === false ? [] : matching.map((point) => point.id),
+      total: matching.length,
+      sourceOptions,
+    }));
   }
 
   create(point: Point): Promise<RepositoryResult<Point>> {

@@ -33,15 +33,34 @@ function setup(factory = new IDBFactory()) {
 }
 
 describe('IndexedDBPointRepository', () => {
-  it('initializes coordinate-toolkit v1 with the points store', async () => {
+  it('initializes coordinate-toolkit v2 with paging indexes', async () => {
     const { client, repository } = setup();
 
     expect(await repository.initialize()).toEqual({ status: 'success', value: undefined });
     const database = await client.open();
 
     expect(database.name).toBe('coordinate-toolkit');
-    expect(database.version).toBe(1);
+    expect(database.version).toBe(2);
     expect(database.objectStoreNames.contains('points')).toBe(true);
+    expect(database.transaction('points').objectStore('points').indexNames.contains('updatedAt')).toBe(true);
+    await client.close();
+  });
+
+  it('returns a page without materializing every matching point in the result', async () => {
+    const { client, repository } = setup();
+    const points = Array.from({ length: 120 }, (_, index) => ({
+      ...point(`page-${index}`),
+      name: `设备 ${index}`,
+      updatedAt: `2026-07-29T10:${String(index % 60).padStart(2, '0')}:00.000Z` as IsoDateTime,
+    }));
+    await repository.createMany(points);
+    const result = await repository.listPage({ offset: 40, limit: 20, sortField: 'updatedAt', sortDirection: 'desc' });
+    expect(result.status).toBe('success');
+    if (result.status === 'success') {
+      expect(result.value.points).toHaveLength(20);
+      expect(result.value.total).toBe(120);
+      expect(result.value.pointIds).toHaveLength(120);
+    }
     await client.close();
   });
 

@@ -40,7 +40,8 @@ describe('visible page prototypes', () => {
 
     expect(await screen.findByRole('heading', { name: '请先配置密钥' })).toBeVisible();
     expect(screen.getByRole('searchbox', { name: '搜索点位' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '显示全部点位' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '显示当前页点位' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: '点位分页' })).toBeVisible();
     expect(screen.getByRole('button', { name: '清空地图' })).toBeVisible();
     expect(screen.getByText('高德专属设置')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '配置密钥' }));

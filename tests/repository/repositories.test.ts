@@ -1,5 +1,5 @@
 import { expectTypeOf } from 'vitest';
-import type { PointListQuery, PointRepository, RepositoryResult } from '@/adapters/storage';
+import type { PointListPage, PointListQuery, PointRepository, RepositoryResult } from '@/adapters/storage';
 import type { Point, PointId } from '@/domain';
 
 function success<Value>(value: Value): RepositoryResult<Value> {
@@ -21,6 +21,17 @@ class MockPointRepository implements PointRepository {
     const offset = query?.offset ?? 0;
     const end = query?.limit === undefined ? undefined : offset + query.limit;
     return Promise.resolve(success(points.slice(offset, end)));
+  }
+
+  async listPage(query: PointListQuery): Promise<RepositoryResult<PointListPage>> {
+    const listed = await this.list(query);
+    if (listed.status === 'failure') return listed;
+    return success({
+      points: listed.value,
+      pointIds: listed.value.map((point) => point.id),
+      total: listed.value.length,
+      sourceOptions: [],
+    });
   }
 
   create(point: Point): Promise<RepositoryResult<Point>> {

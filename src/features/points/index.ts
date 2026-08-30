@@ -2,6 +2,7 @@ import {
   IndexedDBPointRepository,
   MemoryPointRepository,
   type PointListQuery,
+  type PointListPage,
   type PointRepository,
   type RepositoryResult,
 } from '@/adapters/storage';
@@ -28,6 +29,10 @@ class ActivePointRepository implements PointRepository {
 
   list(query?: PointListQuery): Promise<RepositoryResult<readonly Point[]>> {
     return this.#repository.list(query);
+  }
+
+  listPage(query: PointListQuery): Promise<RepositoryResult<PointListPage>> {
+    return this.#repository.listPage(query);
   }
 
   create(point: Point): Promise<RepositoryResult<Point>> {

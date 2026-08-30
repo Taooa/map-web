@@ -17,13 +17,11 @@ import { PointsToolbar } from '@/features/points/components/antd/PointsToolbar';
 import {
   defaultPointSort,
   emptyPointFilters,
-  filterPoints,
   getPageCount,
   hasPointFilters,
-  resolvePointOperationScope,
-  sortPoints,
   validatePointFilters,
   type PointFilters,
+  type PointOperationScope,
   type PointPageSize,
   type PointSort,
 } from '@/features/points/point-list-model';
@@ -48,6 +46,9 @@ export function PointsPageAntd() {
   const pageRef = useRef<HTMLElement>(null);
   const [availableHeight, setAvailableHeight] = useState<number>();
   const [points, setPoints] = useState<readonly Point[]>([]);
+  const [matchingIds, setMatchingIds] = useState<readonly PointId[]>([]);
+  const [total, setTotal] = useState(0);
+  const [sourceOptions, setSourceOptions] = useState<readonly string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draftFilters, setDraftFilters] = useState<PointFilters>(emptyPointFilters);
@@ -60,6 +61,7 @@ export function PointsPageAntd() {
   const [adding, setAdding] = useState(false);
   const [transforming, setTransforming] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportPoints, setExportPoints] = useState<readonly Point[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [editingPoint, setEditingPoint] = useState<Point | null>(null);
 
@@ -81,46 +83,59 @@ export function PointsPageAntd() {
   const refresh = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const result = await pointService.listPoints();
+    const toIso = (value: string) => value ? new Date(value).toISOString() : undefined;
+    const createdFrom = toIso(appliedFilters.createdFrom);
+    const createdTo = toIso(appliedFilters.createdTo);
+    const updatedFrom = toIso(appliedFilters.updatedFrom);
+    const updatedTo = toIso(appliedFilters.updatedTo);
+    const result = await pointService.listPointPage({
+      search: appliedFilters.name,
+      source: appliedFilters.source,
+      ...(createdFrom ? { createdFrom } : {}),
+      ...(createdTo ? { createdTo } : {}),
+      ...(updatedFrom ? { updatedFrom } : {}),
+      ...(updatedTo ? { updatedTo } : {}),
+      sortField: sort.field,
+      sortDirection: sort.direction,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+    });
     setLoading(false);
     if (result.status === 'failure') {
       setLoadError(result.error.message);
       return;
     }
-    setPoints(result.value);
-    const existing = new Set(result.value.map((point) => point.id));
+    setPoints(result.value.points);
+    setMatchingIds(result.value.pointIds);
+    setTotal(result.value.total);
+    setSourceOptions(result.value.sourceOptions);
+    const existing = new Set(result.value.pointIds);
     setSelectedIds((current) => new Set([...current].filter((id) => existing.has(id))));
-  }, []);
+  }, [appliedFilters, page, pageSize, sort]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const sourceOptions = useMemo(
-    () => [...new Set(points.map(sourceName))].sort((a, b) => a.localeCompare(b, 'zh-CN')),
-    [points],
-  );
-  const filteredPoints = useMemo(
-    () => filterPoints(points, appliedFilters, sourceName),
-    [appliedFilters, points],
-  );
-  const sortedPoints = useMemo(() => sortPoints(filteredPoints, sort), [filteredPoints, sort]);
-  const pageCount = getPageCount(sortedPoints.length, pageSize);
+  const pageCount = getPageCount(total, pageSize);
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
-  const pagePoints = useMemo(
-    () => sortedPoints.slice((page - 1) * pageSize, page * pageSize),
-    [page, pageSize, sortedPoints],
-  );
   const scope = useMemo(
-    () => resolvePointOperationScope({ points, filteredPoints, selectedIds, hasAppliedQuery }),
-    [filteredPoints, hasAppliedQuery, points, selectedIds],
+    (): PointOperationScope => {
+      const selected = [...selectedIds];
+      if (selected.length > 0) {
+        return { type: 'selected', pointIds: selected, total: selected.length, label: '已选择' };
+      }
+      return {
+        type: hasAppliedQuery ? 'filtered' : 'all',
+        pointIds: matchingIds,
+        total: matchingIds.length,
+        label: hasAppliedQuery ? '当前查询结果' : '全部数据',
+      };
+    },
+    [hasAppliedQuery, matchingIds, selectedIds],
   );
-  const scopedPoints = useMemo(() => {
-    const ids = new Set(scope.pointIds);
-    return points.filter((point) => ids.has(point.id));
-  }, [points, scope.pointIds]);
 
   function applySearch() {
     const error = validatePointFilters(draftFilters);
@@ -156,6 +171,15 @@ export function PointsPageAntd() {
     });
     await changed(`已删除“${point.name}”。`);
   }
+  async function prepareExport() {
+    setLoading(true);
+    const result = await pointService.listPoints();
+    setLoading(false);
+    if (result.status === 'failure') { void message.error(result.error.message); return; }
+    const ids = new Set(scope.pointIds);
+    setExportPoints(result.value.filter((point) => ids.has(point.id)));
+    setExporting(true);
+  }
 
   return (
     <main
@@ -170,7 +194,7 @@ export function PointsPageAntd() {
         onAdd={() => setAdding(true)}
         onDelete={() => setDeleting(true)}
         onDraftChange={setDraftFilters}
-        onExport={() => setExporting(true)}
+        onExport={() => void prepareExport()}
         onReset={resetSearch}
         onSearch={applySearch}
         onTransform={() => setTransforming(true)}
@@ -207,11 +231,11 @@ export function PointsPageAntd() {
         }}
         page={page}
         pageSize={pageSize}
-        points={pagePoints}
+        points={points}
         selectedIds={selectedIds}
         sort={sort}
         sourceName={sourceName}
-        total={sortedPoints.length}
+        total={total}
       />
       <AddPointModal
         onChanged={(text) => void changed(text)}
@@ -227,7 +251,7 @@ export function PointsPageAntd() {
       <ExportPointsModal
         onClose={() => setExporting(false)}
         open={exporting}
-        points={scopedPoints}
+        points={exportPoints}
         scope={scope}
       />
       <DeletePointsModal

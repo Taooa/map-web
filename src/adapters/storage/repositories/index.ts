@@ -17,5 +17,5 @@ export interface RepositoryError {
 
 export type RepositoryResult<Value> = Result<Value, RepositoryError>;
 
-export type { PointListQuery, PointRepository } from './point-repository';
+export type { PointListPage, PointListQuery, PointRepository } from './point-repository';
 export { MemoryPointRepository } from './memory-point-repository';

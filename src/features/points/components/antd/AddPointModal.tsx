@@ -258,8 +258,8 @@ function ImportPanel({
     setSourceName(file.name);
     const lower = file.name.toLowerCase();
     if (lower.endsWith('.xlsx')) {
-      const { parseExcelWorkbook } = await import('@/adapters/files/excel-parser');
-      const parsed = parseExcelWorkbook(await file.arrayBuffer());
+      const { parseExcelWorkbookAsync } = await import('@/adapters/files/excel-parser-client');
+      const parsed = await parseExcelWorkbookAsync(await file.arrayBuffer());
       setFormat('excel');
       if (parsed.status === 'failure') setError(parsed.error.message);
       else setSheets(parsed.value.sheets);

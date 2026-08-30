@@ -15,6 +15,7 @@ import { pointService } from '@/features/points';
 
 type Platform = 'amap' | 'baidu' | 'tianditu';
 type Status = 'missing-credential' | 'loading' | 'ready' | 'error';
+const MAP_POINT_PAGE_SIZE = 50;
 
 const platforms = {
   amap: {
@@ -61,8 +62,12 @@ export function MapWorkspacePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
   const [points, setPoints] = useState<readonly Point[]>([]);
-  const [selectedIds, setSelectedIds] = useState<readonly PointId[]>([]);
+  const [selectedPoints, setSelectedPoints] = useState<ReadonlyMap<PointId, Point>>(new Map());
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [pointPage, setPointPage] = useState(1);
+  const [pointTotal, setPointTotal] = useState(0);
+  const [pointLoading, setPointLoading] = useState(false);
   const [credentials, setCredentials] = useState<Record<Platform, string>>(() => ({
     amap: localStorage.getItem(platforms.amap.storage) ?? '',
     baidu: localStorage.getItem(platforms.baidu.storage) ?? '',
@@ -75,11 +80,35 @@ export function MapWorkspacePage() {
   const displayedStatus: Status = credential ? status : 'missing-credential';
 
   useEffect(() => {
-    void pointService.listPoints().then((result) => {
-      if (result.status === 'success') setPoints(result.value);
-      else setMessage(result.error.message);
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPointPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    let active = true;
+    setPointLoading(true);
+    void pointService.listPointPage({
+      ...(debouncedQuery ? { search: debouncedQuery } : {}),
+      offset: (pointPage - 1) * MAP_POINT_PAGE_SIZE,
+      limit: MAP_POINT_PAGE_SIZE,
+      sortField: 'updatedAt',
+      sortDirection: 'desc',
+      includePointIds: false,
+    }).then((result) => {
+      if (!active) return;
+      setPointLoading(false);
+      if (result.status === 'success') {
+        setPoints(result.value.points);
+        setPointTotal(result.value.total);
+      } else {
+        setMessage(result.error.message);
+      }
     });
-  }, []);
+    return () => { active = false; };
+  }, [debouncedQuery, pointPage]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -111,26 +140,19 @@ export function MapWorkspacePage() {
     };
   }, [credential, platform]);
 
-  const filteredPoints = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return normalized
-      ? points.filter((point) => point.name.toLowerCase().includes(normalized))
-      : points;
-  }, [points, query]);
+  const selectedIds = useMemo(() => [...selectedPoints.keys()], [selectedPoints]);
+  const pointPageCount = Math.max(1, Math.ceil(pointTotal / MAP_POINT_PAGE_SIZE));
 
   const display = useMemo(() => {
-    const selected = new Set(selectedIds);
     const markers: MapRenderPoint[] = [];
     const missing: Point[] = [];
-    points
-      .filter((point) => selected.has(point.id))
-      .forEach((point) => {
-        const marker = toRenderPoint(platform, point);
-        if (marker) markers.push(marker);
-        else missing.push(point);
-      });
+    selectedPoints.forEach((point) => {
+      const marker = toRenderPoint(platform, point);
+      if (marker) markers.push(marker);
+      else missing.push(point);
+    });
     return { markers, missing };
-  }, [platform, points, selectedIds]);
+  }, [platform, selectedPoints]);
 
   const missingCoordinateMessage = display.missing.length
     ? `${display.missing.map((point) => point.name).join('、')} 需要先转换为 ${config.coordinate}。`
@@ -151,8 +173,25 @@ export function MapWorkspacePage() {
 
   function clearMap() {
     adapterRef.current?.clear();
-    setSelectedIds([]);
+    setSelectedPoints(new Map());
     setMessage(null);
+  }
+
+  function selectCurrentPage() {
+    setSelectedPoints((current) => {
+      const next = new Map(current);
+      points.forEach((point) => next.set(point.id, point));
+      return next;
+    });
+  }
+
+  function togglePoint(point: Point) {
+    setSelectedPoints((current) => {
+      const next = new Map(current);
+      if (next.has(point.id)) next.delete(point.id);
+      else next.set(point.id, point);
+      return next;
+    });
   }
 
   return (
@@ -179,7 +218,7 @@ export function MapWorkspacePage() {
           <div className="map-control-section__title">
             <span>点位选择</span>
             <small>
-              {selectedIds.length} / {points.length}
+              {selectedIds.length} / {pointTotal}
             </small>
           </div>
           <input
@@ -190,8 +229,8 @@ export function MapWorkspacePage() {
             value={query}
           />
           <div className="unified-point-actions">
-            <button onClick={() => setSelectedIds(points.map((point) => point.id))} type="button">
-              显示全部点位
+            <button disabled={points.length === 0} onClick={selectCurrentPage} type="button">
+              显示当前页点位
             </button>
             <button onClick={clearMap} type="button">
               清空地图
@@ -201,24 +240,36 @@ export function MapWorkspacePage() {
             </button>
           </div>
           <div className="unified-point-list">
-            {filteredPoints.map((point) => (
+            {pointLoading && <span className="empty-value">正在加载点位…</span>}
+            {!pointLoading && points.map((point) => (
               <label key={point.id}>
                 <input
                   checked={selectedIds.includes(point.id)}
-                  onChange={() =>
-                    setSelectedIds((current) =>
-                      current.includes(point.id)
-                        ? current.filter((id) => id !== point.id)
-                        : [...current, point.id],
-                    )
-                  }
+                  onChange={() => togglePoint(point)}
                   type="checkbox"
                 />
                 <span>{point.name}</span>
               </label>
             ))}
-            {filteredPoints.length === 0 && <span className="empty-value">没有匹配的点位</span>}
+            {!pointLoading && points.length === 0 && <span className="empty-value">没有匹配的点位</span>}
           </div>
+          <nav className="unified-point-pagination" aria-label="点位分页">
+            <button
+              disabled={pointLoading || pointPage <= 1}
+              onClick={() => setPointPage((current) => Math.max(1, current - 1))}
+              type="button"
+            >
+              上一页
+            </button>
+            <span>{pointPage} / {pointPageCount}（共 {pointTotal} 条）</span>
+            <button
+              disabled={pointLoading || pointPage >= pointPageCount}
+              onClick={() => setPointPage((current) => Math.min(pointPageCount, current + 1))}
+              type="button"
+            >
+              下一页
+            </button>
+          </nav>
         </section>
 
         <section className="unified-credential">

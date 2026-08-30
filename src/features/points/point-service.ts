@@ -1,4 +1,4 @@
-import type { PointRepository } from '@/adapters/storage';
+import type { PointListPage, PointListQuery, PointRepository } from '@/adapters/storage';
 import type {
   Coordinate,
   ConvertedCoordinate,
@@ -81,6 +81,7 @@ export interface PointService {
   deletePoint(id: PointId): Promise<PointServiceResult<void>>;
   getPoint(id: PointId): Promise<PointServiceResult<Point | null>>;
   listPoints(search?: string): Promise<PointServiceResult<readonly Point[]>>;
+  listPointPage(query: PointListQuery): Promise<PointServiceResult<PointListPage>>;
   updatePointName(id: PointId, name: string): Promise<PointServiceResult<Point>>;
   updatePoint(id: PointId, input: UpdatePointInput): Promise<PointServiceResult<Point>>;
   transformPoint(id: PointId, target: CoordinateSystemId): Promise<PointServiceResult<Point>>;
@@ -102,6 +103,8 @@ interface PointServiceDependencies {
   readonly now?: () => IsoDateTime;
   readonly coordinateService?: CoordinateService;
 }
+
+const CREATE_BATCH_SIZE = 2_000;
 
 function success<Value>(value: Value): PointServiceResult<Value> {
   return { status: 'success', value };
@@ -174,12 +177,9 @@ export function createPointService(
   const now = dependencies.now ?? (() => new Date().toISOString() as IsoDateTime);
   const coordinateService = dependencies.coordinateService ?? new CoordinateService();
 
-  async function createOnePoint(input: CreatePointInput): Promise<PointServiceResult<Point>> {
+  function preparePoint(input: CreatePointInput): PointServiceResult<Point> {
     const name = input.name.trim();
-    if (!name) {
-      return failure({ code: 'EMPTY_NAME', message: '请输入点位名称。' });
-    }
-
+    if (!name) return failure({ code: 'EMPTY_NAME', message: '请输入点位名称。' });
     const original = buildCoordinate(input);
     if (!original) {
       return failure({
@@ -190,19 +190,21 @@ export function createPointService(
             : '经度需在 -180 至 180 之间，纬度需在 -90 至 90 之间。',
       });
     }
-
     const timestamp = now();
-    const point: Point = {
+    return success({
       id: createId(),
       name,
       source: input.source ?? { type: 'manual' },
-      coordinates: {
-        original,
-        converted: {},
-      },
+      coordinates: { original, converted: {} },
       createdAt: timestamp,
       updatedAt: timestamp,
-    };
+    });
+  }
+
+  async function createOnePoint(input: CreatePointInput): Promise<PointServiceResult<Point>> {
+    const prepared = preparePoint(input);
+    if (prepared.status === 'failure') return prepared;
+    const point = prepared.value;
     const result = await repository.create(point);
 
     return result.status === 'success'
@@ -360,9 +362,22 @@ export function createPointService(
     createPoint: createOnePoint,
 
     async createPoints(inputs) {
-      const results: PointServiceResult<Point>[] = [];
-      for (const input of inputs) {
-        results.push(await createOnePoint(input));
+      const results = inputs.map(preparePoint);
+      const valid = results.flatMap((result, index) =>
+        result.status === 'success' ? [{ index, point: result.value }] : [],
+      );
+      for (let offset = 0; offset < valid.length; offset += CREATE_BATCH_SIZE) {
+        const batch = valid.slice(offset, offset + CREATE_BATCH_SIZE);
+        const stored = await repository.createMany(batch.map(({ point }) => point));
+        if (stored.status === 'failure') {
+          batch.forEach(({ index, point }) => {
+            results[index] = failure({
+              code: stored.error.code === 'CONFLICT' ? 'DUPLICATE_POINT_ID' : 'REPOSITORY_FAILURE',
+              message: stored.error.message,
+              pointId: point.id,
+            });
+          });
+        }
       }
       return results;
     },
@@ -386,6 +401,13 @@ export function createPointService(
       return result.status === 'success'
         ? success(result.value)
         : repositoryFailure('读取点位列表失败。');
+    },
+
+    async listPointPage(query) {
+      const result = await repository.listPage(query);
+      return result.status === 'success'
+        ? success(result.value)
+        : repositoryFailure('读取点位分页失败。');
     },
 
     updatePointName(id, name) {

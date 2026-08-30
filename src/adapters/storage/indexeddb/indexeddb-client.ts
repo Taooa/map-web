@@ -1,5 +1,5 @@
 export const POINT_DATABASE_NAME = 'coordinate-toolkit';
-export const POINT_DATABASE_VERSION = 1;
+export const POINT_DATABASE_VERSION = 2;
 export const POINT_STORE_NAME = 'points';
 
 export function getIndexedDbFactory(): IDBFactory | undefined {
@@ -60,7 +60,13 @@ export class IndexedDbClient {
       request.addEventListener('upgradeneeded', () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(POINT_STORE_NAME)) {
-          database.createObjectStore(POINT_STORE_NAME, { keyPath: 'id' });
+          const store = database.createObjectStore(POINT_STORE_NAME, { keyPath: 'id' });
+          store.createIndex('createdAt', 'createdAt');
+          store.createIndex('updatedAt', 'updatedAt');
+        } else {
+          const store = request.transaction?.objectStore(POINT_STORE_NAME);
+          if (store && !store.indexNames.contains('createdAt')) store.createIndex('createdAt', 'createdAt');
+          if (store && !store.indexNames.contains('updatedAt')) store.createIndex('updatedAt', 'updatedAt');
         }
       });
       request.addEventListener(
