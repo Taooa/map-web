@@ -3,22 +3,24 @@ import { coordinateFor } from './point-coordinate-display';
 
 export interface PointExportRow {
   readonly name: string;
-  readonly wgs84Lng: number | null;
-  readonly wgs84Lat: number | null;
-  readonly gcj02Lng: number | null;
-  readonly gcj02Lat: number | null;
-  readonly bd09Lng: number | null;
-  readonly bd09Lat: number | null;
-  readonly sh2000X: number | null;
-  readonly sh2000Y: number | null;
+  readonly wgs84Lng: string | null;
+  readonly wgs84Lat: string | null;
+  readonly gcj02Lng: string | null;
+  readonly gcj02Lat: string | null;
+  readonly bd09Lng: string | null;
+  readonly bd09Lat: string | null;
+  readonly sh2000X: string | null;
+  readonly sh2000Y: string | null;
 }
 
 function geographic(
   point: Point,
   system: 'WGS84' | 'GCJ02' | 'BD09',
-): [number | null, number | null] {
+): [string | null, string | null] {
   const coordinate = coordinateFor(point, system);
-  return coordinate?.kind === 'geographic' ? [coordinate.lng, coordinate.lat] : [null, null];
+  return coordinate?.kind === 'geographic'
+    ? [String(coordinate.lng), String(coordinate.lat)]
+    : [null, null];
 }
 
 export function createPointExportRows(points: readonly Point[]): PointExportRow[] {
@@ -35,8 +37,8 @@ export function createPointExportRows(points: readonly Point[]): PointExportRow[
       gcj02Lat,
       bd09Lng,
       bd09Lat,
-      sh2000X: shanghai?.kind === 'projected' ? shanghai.x : null,
-      sh2000Y: shanghai?.kind === 'projected' ? shanghai.y : null,
+      sh2000X: shanghai?.kind === 'projected' ? String(shanghai.x) : null,
+      sh2000Y: shanghai?.kind === 'projected' ? String(shanghai.y) : null,
     };
   });
 }
