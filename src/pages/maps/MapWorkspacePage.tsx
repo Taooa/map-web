@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type UIEvent } from 'react';
+import {
+  AimOutlined,
+  AppstoreOutlined,
+  DeleteOutlined,
+  LeftOutlined,
+  RightOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
+import { Button, Popover, Select, Tooltip } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { AMapAdapter } from '@/adapters/maps/amap/amap-adapter';
 import { AMapToolbar } from '@/adapters/maps/amap/AMapToolbar';
@@ -60,14 +69,16 @@ export function MapWorkspacePage() {
   const platform: Platform = isPlatform(requestedPlatform) ? requestedPlatform : 'amap';
   const config = platforms[platform];
   const containerRef = useRef<HTMLDivElement>(null);
+  const pointListRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
+  const pointRequestIdRef = useRef(0);
+  const pointLoadingRef = useRef(true);
   const [points, setPoints] = useState<readonly Point[]>([]);
   const [selectedPoints, setSelectedPoints] = useState<ReadonlyMap<PointId, Point>>(new Map());
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [pointPage, setPointPage] = useState(1);
   const [pointTotal, setPointTotal] = useState(0);
-  const [pointLoading, setPointLoading] = useState(false);
+  const [pointLoading, setPointLoading] = useState(true);
   const [credentials, setCredentials] = useState<Record<Platform, string>>(() => ({
     amap: localStorage.getItem(platforms.amap.storage) ?? '',
     baidu: localStorage.getItem(platforms.baidu.storage) ?? '',
@@ -77,28 +88,37 @@ export function MapWorkspacePage() {
   const [status, setStatus] = useState<Status>(credential ? 'loading' : 'missing-credential');
   const [message, setMessage] = useState<string | null>(null);
   const [credentialDialog, setCredentialDialog] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const displayedStatus: Status = credential ? status : 'missing-credential';
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedQuery(query.trim());
-      setPointPage(1);
+      const nextQuery = query.trim();
+      if (nextQuery === debouncedQuery) return;
+      pointRequestIdRef.current += 1;
+      pointLoadingRef.current = true;
+      setPoints([]);
+      setPointTotal(0);
+      setPointLoading(true);
+      if (pointListRef.current) pointListRef.current.scrollTop = 0;
+      setDebouncedQuery(nextQuery);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [query]);
+  }, [debouncedQuery, query]);
 
   useEffect(() => {
+    const requestId = ++pointRequestIdRef.current;
     let active = true;
-    setPointLoading(true);
     void pointService.listPointPage({
       ...(debouncedQuery ? { search: debouncedQuery } : {}),
-      offset: (pointPage - 1) * MAP_POINT_PAGE_SIZE,
+      offset: 0,
       limit: MAP_POINT_PAGE_SIZE,
       sortField: 'updatedAt',
       sortDirection: 'desc',
       includePointIds: false,
     }).then((result) => {
-      if (!active) return;
+      if (!active || requestId !== pointRequestIdRef.current) return;
+      pointLoadingRef.current = false;
       setPointLoading(false);
       if (result.status === 'success') {
         setPoints(result.value.points);
@@ -107,8 +127,10 @@ export function MapWorkspacePage() {
         setMessage(result.error.message);
       }
     });
-    return () => { active = false; };
-  }, [debouncedQuery, pointPage]);
+    return () => {
+      active = false;
+    };
+  }, [debouncedQuery]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -141,7 +163,7 @@ export function MapWorkspacePage() {
   }, [credential, platform]);
 
   const selectedIds = useMemo(() => [...selectedPoints.keys()], [selectedPoints]);
-  const pointPageCount = Math.max(1, Math.ceil(pointTotal / MAP_POINT_PAGE_SIZE));
+  const hasMorePoints = points.length < pointTotal;
 
   const display = useMemo(() => {
     const markers: MapRenderPoint[] = [];
@@ -177,12 +199,48 @@ export function MapWorkspacePage() {
     setMessage(null);
   }
 
-  function selectCurrentPage() {
+  function selectLoadedPoints() {
     setSelectedPoints((current) => {
       const next = new Map(current);
       points.forEach((point) => next.set(point.id, point));
       return next;
     });
+  }
+
+  function loadMorePoints() {
+    if (pointLoadingRef.current || !hasMorePoints) return;
+    const requestId = pointRequestIdRef.current;
+    const offset = points.length;
+    pointLoadingRef.current = true;
+    setPointLoading(true);
+    void pointService.listPointPage({
+      ...(debouncedQuery ? { search: debouncedQuery } : {}),
+      offset,
+      limit: MAP_POINT_PAGE_SIZE,
+      sortField: 'updatedAt',
+      sortDirection: 'desc',
+      includePointIds: false,
+    }).then((result) => {
+      if (requestId !== pointRequestIdRef.current) return;
+      pointLoadingRef.current = false;
+      setPointLoading(false);
+      if (result.status === 'success') {
+        setPoints((current) => {
+          const pointIds = new Set(current.map((point) => point.id));
+          return [...current, ...result.value.points.filter((point) => !pointIds.has(point.id))];
+        });
+        setPointTotal(result.value.total);
+      } else {
+        setMessage(result.error.message);
+      }
+    });
+  }
+
+  function handlePointListScroll(event: UIEvent<HTMLDivElement>) {
+    const list = event.currentTarget;
+    if (list.scrollHeight - list.scrollTop - list.clientHeight <= 48) {
+      loadMorePoints();
+    }
   }
 
   function togglePoint(point: Point) {
@@ -196,101 +254,45 @@ export function MapWorkspacePage() {
 
   return (
     <div className={`unified-map-workspace unified-map-workspace--${platform}`}>
-      <aside className="unified-map-panel">
-        <header>
-          <div className="unified-platform-switch" role="tablist" aria-label="地图平台切换">
-            {(Object.keys(platforms) as Platform[]).map((item) => (
-              <button
-                aria-selected={item === platform}
-                className={item === platform ? 'is-active' : ''}
-                key={item}
-                onClick={() => switchPlatform(item)}
-                role="tab"
-                type="button"
-              >
-                {platforms[item].name}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        <section className="unified-point-tools">
-          <div className="map-control-section__title">
-            <span>点位选择</span>
-            <small>
-              {selectedIds.length} / {pointTotal}
-            </small>
-          </div>
-          <input
-            aria-label="搜索点位"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索点位名称"
-            type="search"
-            value={query}
-          />
-          <div className="unified-point-actions">
-            <button disabled={points.length === 0} onClick={selectCurrentPage} type="button">
-              显示当前页点位
-            </button>
-            <button onClick={clearMap} type="button">
-              清空地图
-            </button>
-            <button onClick={() => adapterRef.current?.fitView()} type="button">
-              查看全部标记
-            </button>
-          </div>
-          <div className="unified-point-list">
-            {pointLoading && <span className="empty-value">正在加载点位…</span>}
-            {!pointLoading && points.map((point) => (
-              <label key={point.id}>
-                <input
-                  checked={selectedIds.includes(point.id)}
-                  onChange={() => togglePoint(point)}
-                  type="checkbox"
-                />
-                <span>{point.name}</span>
-              </label>
-            ))}
-            {!pointLoading && points.length === 0 && <span className="empty-value">没有匹配的点位</span>}
-          </div>
-          <nav className="unified-point-pagination" aria-label="点位分页">
-            <button
-              disabled={pointLoading || pointPage <= 1}
-              onClick={() => setPointPage((current) => Math.max(1, current - 1))}
-              type="button"
-            >
-              上一页
-            </button>
-            <span>{pointPage} / {pointPageCount}（共 {pointTotal} 条）</span>
-            <button
-              disabled={pointLoading || pointPage >= pointPageCount}
-              onClick={() => setPointPage((current) => Math.min(pointPageCount, current + 1))}
-              type="button"
-            >
-              下一页
-            </button>
-          </nav>
-        </section>
-
-        <section className="unified-credential">
-          <span>{credential ? `${config.credential}已配置` : `${config.credential}未配置`}</span>
-          <button onClick={() => setCredentialDialog(true)} type="button">
-            配置{config.credential}
-          </button>
-        </section>
-
-        {platform === 'amap' && <AMapToolbar />}
-        {platform === 'baidu' && <BaiduToolbar />}
-        {platform === 'tianditu' && <TiandituToolbar />}
-        {(message ?? missingCoordinateMessage) && (
-          <div className="map-inline-warning" role="alert">
-            {message ?? missingCoordinateMessage}
-          </div>
-        )}
-      </aside>
-
       <section className="unified-map-canvas" aria-label={`${config.name}区域`}>
         <div className="unified-map-container" ref={containerRef} />
+        <div className="unified-map-tools-top" aria-label="地图工具">
+          <Select
+            aria-label="地图平台切换"
+            className="unified-map-platform-select"
+            onChange={(value) => {
+              if (isPlatform(value)) switchPlatform(value);
+            }}
+            options={(Object.keys(platforms) as Platform[]).map((item) => ({
+              label: platforms[item].name,
+              value: item,
+            }))}
+            value={platform}
+          />
+          <Popover
+            content={
+              <div className="unified-map-layer-popover">
+                {platform === 'amap' && <AMapToolbar />}
+                {platform === 'baidu' && <BaiduToolbar />}
+                {platform === 'tianditu' && <TiandituToolbar />}
+              </div>
+            }
+            placement="bottomRight"
+            title={`${config.name}图层设置`}
+            trigger="click"
+          >
+            <Button aria-label="图层设置" icon={<AppstoreOutlined />} shape="circle" />
+          </Popover>
+          <Tooltip title={credential ? `修改${config.credential}` : `配置${config.credential}`}>
+            <Button
+              aria-label={`配置${config.credential}`}
+              className={credential ? 'is-configured' : ''}
+              icon={<SettingOutlined />}
+              onClick={() => setCredentialDialog(true)}
+              shape="circle"
+            />
+          </Tooltip>
+        </div>
         {displayedStatus !== 'ready' && (
           <div className="map-missing-card">
             <div>
@@ -307,6 +309,113 @@ export function MapWorkspacePage() {
           </div>
         )}
       </section>
+
+      <aside
+        aria-hidden={panelCollapsed}
+        aria-label="点位面板"
+        className={`unified-map-panel${panelCollapsed ? ' is-collapsed' : ''}`}
+      >
+        <header className="unified-map-panel__header">
+          <div>
+            <strong>点位</strong>
+            <small>当前 {pointTotal} 个点位</small>
+          </div>
+          <Tooltip title="收起点位面板">
+            <Button
+              aria-label="收起点位面板"
+              icon={<LeftOutlined />}
+              onClick={() => setPanelCollapsed(true)}
+              shape="circle"
+              size="small"
+              type="text"
+            />
+          </Tooltip>
+        </header>
+
+        <section className="unified-point-tools">
+          <input
+            aria-label="搜索点位"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索点位名称"
+            type="search"
+            value={query}
+          />
+          <div className="unified-point-actions">
+            <button disabled={points.length === 0} onClick={selectLoadedPoints} type="button">
+              显示已加载点位
+            </button>
+          </div>
+          <div
+            aria-label="点位滚动列表"
+            aria-busy={pointLoading}
+            className="unified-point-list"
+            onScroll={handlePointListScroll}
+            ref={pointListRef}
+          >
+            {pointLoading && points.length === 0 && (
+              <span className="empty-value">正在加载点位…</span>
+            )}
+            {points.map((point) => (
+              <label key={point.id}>
+                <input
+                  checked={selectedIds.includes(point.id)}
+                  onChange={() => togglePoint(point)}
+                  type="checkbox"
+                />
+                <span>{point.name}</span>
+              </label>
+            ))}
+            {!pointLoading && points.length === 0 && <span className="empty-value">没有匹配的点位</span>}
+            {points.length > 0 && (
+              <span className="unified-point-list__status">
+                {pointLoading
+                  ? '正在加载更多…'
+                  : hasMorePoints
+                    ? `向下滚动加载更多（已加载 ${points.length} / ${pointTotal}）`
+                    : `已加载全部 ${pointTotal} 条`}
+              </span>
+            )}
+          </div>
+        </section>
+
+        {(message ?? missingCoordinateMessage) && (
+          <div className="map-inline-warning" role="alert">
+            {message ?? missingCoordinateMessage}
+          </div>
+        )}
+      </aside>
+
+      <div className="unified-map-tools-bottom" aria-label="基础地图控制">
+        <Tooltip placement="left" title="查看全部点位">
+          <Button
+            aria-label="查看全部点位"
+            icon={<AimOutlined />}
+            onClick={() => adapterRef.current?.fitView()}
+            shape="circle"
+          />
+        </Tooltip>
+        <Tooltip placement="left" title="清空地图">
+          <Button
+            aria-label="清空地图"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={clearMap}
+            shape="circle"
+          />
+        </Tooltip>
+      </div>
+
+      {panelCollapsed && (
+        <Tooltip title="展开点位面板" placement="right">
+          <Button
+            aria-label="展开点位面板"
+            className="unified-map-panel-expand"
+            icon={<RightOutlined />}
+            onClick={() => setPanelCollapsed(false)}
+            shape="circle"
+          />
+        </Tooltip>
+      )}
 
       {credentialDialog && (
         <CredentialDialog

@@ -10,17 +10,16 @@ describe('route /points', () => {
 });
 
 describe.each([
-  ['/map/amap', '高德地图'],
-  ['/map/baidu', '百度地图'],
-  ['/map/tianditu', '天地图'],
-])('legacy route %s', (path, platform) => {
+  ['/map/amap', '高德地图', 'amap'],
+  ['/map/baidu', '百度地图', 'baidu'],
+  ['/map/tianditu', '天地图', 'tianditu'],
+])('legacy route %s', (path, platform, platformValue) => {
   it(`redirects to the shared workspace with ${platform} selected`, async () => {
     renderRoute(path);
 
-    expect(await screen.findByRole('tab', { name: platform })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    const select = await screen.findByRole('combobox', { name: '地图平台切换' });
+    expect(select.closest('.ant-select')).toHaveTextContent(platform);
+    expect(path).toContain(platformValue);
   });
 });
 

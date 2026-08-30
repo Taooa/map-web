@@ -2145,39 +2145,93 @@ html[data-theme='dark'] .radix-alert-dialog {
 }
 
 /* Maps */
+.app-main:has(> .unified-map-workspace) {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .unified-map-workspace {
-  display: grid;
-  min-height: calc(100vh - 73px);
-  grid-template-columns: 360px minmax(0, 1fr);
+  position: relative;
+  width: 100%;
+  height: calc(100dvh - 73px);
+  min-height: 520px;
+  overflow: hidden;
   background: #eef4f7;
 }
 
 .unified-map-panel {
-  position: relative;
-  z-index: 2;
-  padding: 26px 22px;
-  overflow-y: auto;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  width: 340px;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: 0 12px 34px rgba(24, 55, 73, 0.14);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    transform 200ms ease,
+    opacity 160ms ease,
+    visibility 0s linear;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
 }
 
-.unified-map-panel h1 {
-  margin: 0 0 18px;
-  font-size: 25px;
+.unified-map-panel.is-collapsed {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(-100% - 24px));
+  transition:
+    transform 200ms ease,
+    opacity 160ms ease,
+    visibility 0s linear 200ms;
 }
 
-.unified-platform-switch {
+.unified-map-panel__header {
+  display: flex;
+  padding-bottom: 12px;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  flex: none;
+}
+
+.unified-map-panel__header > div {
   display: grid;
-  padding: 4px;
-  gap: 4px;
-  border-radius: 10px;
-  background: var(--color-surface-strong);
-  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
 }
 
-.unified-platform-switch button,
-.unified-point-actions button,
-.unified-credential button {
+.unified-map-panel__header strong {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.unified-map-panel__header small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.unified-map-panel-expand {
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  left: 16px;
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(8px);
+}
+
+.unified-point-actions button {
   min-height: 34px;
   border: 1px solid transparent;
   border-radius: 7px;
@@ -2187,15 +2241,12 @@ html[data-theme='dark'] .radix-alert-dialog {
   font-weight: 720;
 }
 
-.unified-platform-switch button.is-active {
-  border-color: var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-accent-strong);
-  box-shadow: var(--shadow-soft);
-}
-
 .unified-point-tools {
-  margin-top: 24px;
+  display: flex;
+  min-height: 0;
+  padding-top: 2px;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .unified-point-tools > input {
@@ -2208,24 +2259,22 @@ html[data-theme='dark'] .radix-alert-dialog {
 }
 
 .unified-point-actions {
-  display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(3, 1fr);
+  display: block;
 }
 
-.unified-point-actions button,
-.unified-credential button {
+.unified-point-actions button {
+  width: 100%;
   border-color: var(--color-border);
   background: var(--color-surface-subtle);
 }
 
 .unified-point-list {
-  display: grid;
-  max-height: 260px;
+  min-height: 0;
   margin-top: 10px;
   overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: 9px;
+  flex: 1 1 auto;
 }
 
 .unified-point-list label {
@@ -2241,55 +2290,28 @@ html[data-theme='dark'] .radix-alert-dialog {
   border-bottom: 0;
 }
 
-.unified-point-pagination {
-  display: grid;
-  margin-top: 8px;
-  gap: 6px;
-  align-items: center;
-  grid-template-columns: auto 1fr auto;
-}
-
-.unified-point-pagination span {
+.unified-point-list__status {
+  display: block;
+  padding: 9px 10px;
   color: var(--color-text-muted);
   font-size: 10px;
   text-align: center;
 }
 
-.unified-point-pagination button {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 7px;
-  background: var(--color-surface-subtle);
-  cursor: pointer;
-  font-size: 10px;
-}
-
-.unified-point-pagination button:disabled,
 .unified-point-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
 
-.unified-credential {
-  display: flex;
-  margin-top: 18px;
-  padding: 12px 0;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-  font-size: 10px;
-}
-
 .platform-toolbar {
   display: grid;
-  margin-top: 18px;
+  margin-top: 0;
   padding: 14px;
   gap: 10px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-surface-subtle);
+  flex: none;
 }
 
 .platform-toolbar > strong {
@@ -2318,14 +2340,72 @@ html[data-theme='dark'] .radix-alert-dialog {
 }
 
 .unified-map-canvas {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   min-width: 0;
-  min-height: calc(100vh - 73px);
 }
 
 .unified-map-container {
   position: absolute;
+  width: 100%;
+  height: 100%;
   inset: 0;
+}
+
+.unified-map-tools-top,
+.unified-map-tools-bottom {
+  position: absolute;
+  z-index: 7;
+  display: flex;
+  border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: 0 10px 28px rgba(24, 55, 73, 0.13);
+  backdrop-filter: blur(8px);
+}
+
+.unified-map-tools-top {
+  top: 18px;
+  right: 18px;
+  padding: 7px;
+  gap: 8px;
+  align-items: center;
+}
+
+.unified-map-platform-select {
+  width: 132px;
+}
+
+.unified-map-tools-top .ant-btn,
+.unified-map-tools-bottom .ant-btn {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+}
+
+.unified-map-tools-top .ant-btn.is-configured {
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  color: var(--color-accent-strong);
+}
+
+.unified-map-tools-bottom {
+  right: 18px;
+  bottom: 20px;
+  padding: 6px;
+  gap: 7px;
+  flex-direction: column;
+}
+
+.unified-map-layer-popover {
+  width: 230px;
+}
+
+.unified-map-layer-popover .platform-toolbar {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .map-workspace {
@@ -3134,17 +3214,32 @@ html[data-theme='dark'] .radix-alert-dialog {
 
 @media (max-width: 760px) {
   .unified-map-workspace {
-    grid-template-columns: 1fr;
+    height: calc(100dvh - 116px);
   }
 
   .unified-map-panel {
-    max-height: 52vh;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border);
+    top: 72px;
+    bottom: 12px;
+    left: 12px;
+    width: min(340px, calc(100% - 24px));
+    padding: 14px;
   }
 
-  .unified-map-canvas {
-    min-height: 58vh;
+  .unified-map-tools-top {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    justify-content: flex-end;
+  }
+
+  .unified-map-tools-bottom {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .unified-map-panel-expand {
+    top: 72px;
+    left: 12px;
   }
 
   .app-header {
