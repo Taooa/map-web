@@ -46,11 +46,17 @@ describe('PointService editing and scoped operations', () => {
     });
     if (first.status !== 'success' || second.status !== 'success') throw new Error('seed failed');
     await service.transformPointFrom(first.value.id, 'WGS84', 'GCJ02');
+    const progress: { completed: number; total: number }[] = [];
     const result = await service.transformPointsFrom(
       [first.value.id, second.value.id],
       'GCJ02',
       'BD09',
+      (next) => progress.push(next),
     );
+    expect(progress).toEqual([
+      { completed: 1, total: 2 },
+      { completed: 2, total: 2 },
+    ]);
     expect(result).toMatchObject({
       total: 2,
       successCount: 1,

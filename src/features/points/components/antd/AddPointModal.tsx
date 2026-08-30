@@ -6,8 +6,10 @@ import {
   Input,
   InputNumber,
   Modal,
+  Progress,
   Select,
   Space,
+  Spin,
   Table,
   Tabs,
   Tooltip,
@@ -53,50 +55,74 @@ function MappingPanel({
     latitudeColumn: 2,
   });
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState({ completed: 0, total: sheet.rows.length });
   const [error, setError] = useState<string | null>(null);
   const duplicate =
     new Set([mapping.nameColumn, mapping.longitudeColumn, mapping.latitudeColumn]).size < 3;
   const options = sheet.columns.map((column) => ({ label: column.label, value: column.index }));
   async function runImport() {
     setBusy(true);
+    setProgress({ completed: 0, total: sheet.rows.length });
     setError(null);
-    const result = await importService.importTable({ sheet, mapping, system, format, sourceName });
-    setBusy(false);
-    if (result.failureCount) {
-      setError(
-        `成功 ${result.successCount} 条，失败 ${result.failureCount} 条。首条失败：第 ${result.failures[0]!.row} 行，${result.failures[0]!.reason}`,
-      );
+    try {
+      const result = await importService.importTable({
+        sheet,
+        mapping,
+        system,
+        format,
+        sourceName,
+        onProgress: setProgress,
+      });
+      setProgress({ completed: sheet.rows.length, total: sheet.rows.length });
+      if (result.failureCount) {
+        setError(
+          `成功 ${result.successCount} 条，失败 ${result.failureCount} 条。首条失败：第 ${result.failures[0]!.row} 行，${result.failures[0]!.reason}`,
+        );
+      }
+      if (result.successCount)
+        onChanged(
+          `已导入 ${result.successCount} 个点位${result.failureCount ? `，${result.failureCount} 条失败` : ''}。`,
+        );
+    } catch {
+      setError('导入失败，请稍后重试。');
+    } finally {
+      setBusy(false);
     }
-    if (result.successCount)
-      onChanged(
-        `已导入 ${result.successCount} 个点位${result.failureCount ? `，${result.failureCount} 条失败` : ''}。`,
-      );
   }
   return (
     <div className="points-antd-import-mapping">
       {error && (
         <Alert closable title={error} onClose={() => setError(null)} showIcon type="error" />
       )}
-      <Space wrap>
-        <Select
-          aria-label="点位名称字段"
-          onChange={(value) => setMapping({ ...mapping, nameColumn: value })}
-          options={options}
-          value={mapping.nameColumn}
-        />
-        <Select
-          aria-label={system === 'SHANGHAI2000' ? 'X 字段' : '经度字段'}
-          onChange={(value) => setMapping({ ...mapping, longitudeColumn: value })}
-          options={options}
-          value={mapping.longitudeColumn}
-        />
-        <Select
-          aria-label={system === 'SHANGHAI2000' ? 'Y 字段' : '纬度字段'}
-          onChange={(value) => setMapping({ ...mapping, latitudeColumn: value })}
-          options={options}
-          value={mapping.latitudeColumn}
-        />
-      </Space>
+      <div className="points-antd-import-total">
+        待导入点位总数：<strong>{sheet.rows.length}</strong> 条
+      </div>
+      <Form className="points-antd-import-fields" layout="inline">
+        <Form.Item label="点位名称">
+          <Select
+            aria-label="点位名称字段"
+            onChange={(value) => setMapping({ ...mapping, nameColumn: value })}
+            options={options}
+            value={mapping.nameColumn}
+          />
+        </Form.Item>
+        <Form.Item label={system === 'SHANGHAI2000' ? 'X 坐标' : '经度'}>
+          <Select
+            aria-label={system === 'SHANGHAI2000' ? 'X 字段' : '经度字段'}
+            onChange={(value) => setMapping({ ...mapping, longitudeColumn: value })}
+            options={options}
+            value={mapping.longitudeColumn}
+          />
+        </Form.Item>
+        <Form.Item label={system === 'SHANGHAI2000' ? 'Y 坐标' : '纬度'}>
+          <Select
+            aria-label={system === 'SHANGHAI2000' ? 'Y 字段' : '纬度字段'}
+            onChange={(value) => setMapping({ ...mapping, latitudeColumn: value })}
+            options={options}
+            value={mapping.latitudeColumn}
+          />
+        </Form.Item>
+      </Form>
       {duplicate && <Alert title="名称与两个坐标字段不能重复。" showIcon type="warning" />}
       <Table
         columns={sheet.columns.map((column) => ({
@@ -119,6 +145,16 @@ function MappingPanel({
         scroll={{ x: true }}
         size="small"
       />
+      {busy && (
+        <Progress
+          aria-label="导入进度"
+          percent={
+            progress.total === 0 ? 100 : Math.round((progress.completed / progress.total) * 100)
+          }
+          status="active"
+          format={() => `${progress.completed} / ${progress.total}`}
+        />
+      )}
       <Button disabled={duplicate} loading={busy} onClick={() => void runImport()} type="primary">
         确认导入
       </Button>
@@ -154,6 +190,7 @@ function ManualPanel({ onChanged }: { readonly onChanged: (message: string) => v
   }
   return (
     <Form<ManualValues>
+      className="points-antd-manual-form"
       form={form}
       initialValues={{ system: 'WGS84', rows: [{ name: '', first: undefined, second: undefined }] }}
       layout="vertical"
@@ -227,7 +264,7 @@ function ManualPanel({ onChanged }: { readonly onChanged: (message: string) => v
           </div>
         )}
       </Form.List>
-      <Button htmlType="submit" loading={busy} type="primary">
+      <Button className="points-antd-manual-submit" htmlType="submit" loading={busy} type="primary">
         确认新增
       </Button>
     </Form>
@@ -249,33 +286,41 @@ function ImportPanel({
     mode === 'json' ? 'json-paste' : 'excel',
   );
   const [json, setJson] = useState('');
+  const [parsing, setParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sheet = sheets[sheetIndex];
   async function parseFile(file: File) {
+    setParsing(true);
     setSheets([]);
     setSheetIndex(0);
     setError(null);
     setSourceName(file.name);
-    const lower = file.name.toLowerCase();
-    if (lower.endsWith('.xlsx')) {
-      const { parseExcelWorkbookAsync } = await import('@/adapters/files/excel-parser-client');
-      const parsed = await parseExcelWorkbookAsync(await file.arrayBuffer());
-      setFormat('excel');
-      if (parsed.status === 'failure') setError(parsed.error.message);
-      else setSheets(parsed.value.sheets);
-    } else if (lower.endsWith('.csv')) {
-      const { parseCsv } = await import('@/adapters/files/csv-parser');
-      const parsed = parseCsv(await file.text(), file.name);
-      setFormat('csv');
-      if (parsed.status === 'failure') setError(parsed.error.message);
-      else setSheets([parsed.value]);
-    } else if (lower.endsWith('.json')) {
-      const { parseJsonPoints } = await import('@/adapters/files/json-parser');
-      const parsed = parseJsonPoints(await file.text(), file.name);
-      setFormat('json-file');
-      if (parsed.status === 'failure') setError(parsed.error.message);
-      else setSheets([parsed.value]);
-    } else setError('仅支持 .xlsx、.csv 或 .json 文件。');
+    try {
+      const lower = file.name.toLowerCase();
+      if (lower.endsWith('.xlsx')) {
+        const { parseExcelWorkbookAsync } = await import('@/adapters/files/excel-parser-client');
+        const parsed = await parseExcelWorkbookAsync(await file.arrayBuffer());
+        setFormat('excel');
+        if (parsed.status === 'failure') setError(parsed.error.message);
+        else setSheets(parsed.value.sheets);
+      } else if (lower.endsWith('.csv')) {
+        const { parseCsv } = await import('@/adapters/files/csv-parser');
+        const parsed = parseCsv(await file.text(), file.name);
+        setFormat('csv');
+        if (parsed.status === 'failure') setError(parsed.error.message);
+        else setSheets([parsed.value]);
+      } else if (lower.endsWith('.json')) {
+        const { parseJsonPoints } = await import('@/adapters/files/json-parser');
+        const parsed = parseJsonPoints(await file.text(), file.name);
+        setFormat('json-file');
+        if (parsed.status === 'failure') setError(parsed.error.message);
+        else setSheets([parsed.value]);
+      } else setError('仅支持 .xlsx、.csv 或 .json 文件。');
+    } catch {
+      setError('文件解析失败，请检查文件格式后重试。');
+    } finally {
+      setParsing(false);
+    }
     return false;
   }
   async function parseJson() {
@@ -313,21 +358,24 @@ function ImportPanel({
         </Form.Item>
       </Form>
       {mode === 'upload' ? (
-        <Upload.Dragger
-          accept=".xlsx,.csv,.json"
-          beforeUpload={parseFile}
-          maxCount={1}
-          onRemove={() => {
-            setSheets([]);
-            return true;
-          }}
-        >
-          <p className="ant-upload-drag-icon">
-            <InboxOutlined />
-          </p>
-          <p className="ant-upload-text">点击或拖拽文件到此区域</p>
-          <p className="ant-upload-hint">支持 Excel、CSV 和 JSON；文件只在当前浏览器内解析。</p>
-        </Upload.Dragger>
+        <Spin className="points-antd-upload-spin" spinning={parsing} tip="正在解析文件...">
+          <Upload.Dragger
+            accept=".xlsx,.csv,.json"
+            beforeUpload={parseFile}
+            disabled={parsing}
+            maxCount={1}
+            onRemove={() => {
+              setSheets([]);
+              return true;
+            }}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">点击或拖拽文件到此区域</p>
+            <p className="ant-upload-hint">支持 Excel、CSV 和 JSON；文件只在当前浏览器内解析。</p>
+          </Upload.Dragger>
+        </Spin>
       ) : (
         <Space orientation="vertical" style={{ width: '100%' }}>
           <Input.TextArea

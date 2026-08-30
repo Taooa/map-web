@@ -57,6 +57,11 @@ export interface TransformPointsResult {
   readonly failures: readonly TransformPointFailure[];
 }
 
+export interface TransformPointsProgress {
+  readonly completed: number;
+  readonly total: number;
+}
+
 export type PointServiceErrorCode =
   | 'EMPTY_NAME'
   | 'INVALID_COORDINATE'
@@ -94,6 +99,7 @@ export interface PointService {
     ids: readonly PointId[],
     source: EditableCoordinateSystem,
     target: EditableCoordinateSystem,
+    onProgress?: (progress: TransformPointsProgress) => void,
   ): Promise<TransformPointsResult>;
   deletePoints(ids: readonly PointId[]): Promise<BulkDeleteResult>;
 }
@@ -430,10 +436,10 @@ export function createPointService(
 
     transformPointFrom: transformOnePointFrom,
 
-    async transformPointsFrom(ids, source, target) {
+    async transformPointsFrom(ids, source, target, onProgress) {
       const failures: TransformPointFailure[] = [];
       let successCount = 0;
-      for (const id of ids) {
+      for (const [index, id] of ids.entries()) {
         const pointResult = await repository.get(id);
         const point = pointResult.status === 'success' ? pointResult.value : null;
         const sourceCoordinate = point ? coordinateAt(point, source) : null;
@@ -449,6 +455,7 @@ export function createPointService(
             message: result.error.message,
           });
         }
+        onProgress?.({ completed: index + 1, total: ids.length });
       }
       return { total: ids.length, successCount, failureCount: failures.length, failures };
     },

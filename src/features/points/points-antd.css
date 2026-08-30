@@ -208,6 +208,31 @@
   margin-bottom: 0;
 }
 
+.points-antd-manual-submit {
+  margin-top: 20px;
+}
+
+.points-antd-upload-spin {
+  width: 100%;
+}
+
+.points-antd-import-total {
+  color: var(--color-text-soft);
+  font-size: 14px;
+}
+
+.points-antd-import-fields {
+  gap: 12px;
+}
+
+.points-antd-import-fields .ant-form-item {
+  margin: 0;
+}
+
+.points-antd-import-fields .ant-select {
+  width: 160px;
+}
+
 @media (max-width: 1180px) {
   .points-antd-query-actions {
     margin-left: 0 !important;

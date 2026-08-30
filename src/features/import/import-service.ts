@@ -9,10 +9,16 @@ import {
 } from '@/features/import/excel-importer';
 import { pointService, type PointService } from '@/features/points';
 
+export interface ImportProgress {
+  readonly completed: number;
+  readonly total: number;
+}
+
 export interface ImportExcelSheetInput {
   readonly sheet: ExcelSheetData;
   readonly mapping: ExcelFieldMapping;
   readonly system: ExcelImportCoordinateSystem;
+  readonly onProgress?: (progress: ImportProgress) => void;
 }
 
 export interface ImportTableInput extends ImportExcelSheetInput {
@@ -30,6 +36,8 @@ export interface ExcelImportSummary {
 interface ImportServiceDependencies {
   readonly createImportId?: () => ImportRecordId;
 }
+
+const IMPORT_PROGRESS_BATCH_SIZE = 200;
 
 export class ImportService {
   readonly #pointService: PointService;
@@ -55,22 +63,32 @@ export class ImportService {
       input.format,
       input.sourceName,
     );
-    const creationResults = await this.#pointService.createPoints(
-      mapped.candidates.map((candidate) => candidate.input),
-    );
     const successfulPoints: Point[] = [];
     const failures: ExcelRowFailure[] = [...mapped.failures];
+    const total = input.sheet.rows.length;
+    let completed = mapped.failures.length;
+    input.onProgress?.({ completed, total });
 
-    creationResults.forEach((result, index) => {
-      const candidate = mapped.candidates[index];
-      if (!candidate) return;
+    for (let offset = 0; offset < mapped.candidates.length; offset += IMPORT_PROGRESS_BATCH_SIZE) {
+      const candidates = mapped.candidates.slice(offset, offset + IMPORT_PROGRESS_BATCH_SIZE);
+      const creationResults = await this.#pointService.createPoints(
+        candidates.map((candidate) => candidate.input),
+      );
 
-      if (result.status === 'success') {
-        successfulPoints.push(result.value);
-      } else {
-        failures.push({ row: candidate.row, reason: result.error.message });
-      }
-    });
+      creationResults.forEach((result, index) => {
+        const candidate = candidates[index];
+        if (!candidate) return;
+
+        if (result.status === 'success') {
+          successfulPoints.push(result.value);
+        } else {
+          failures.push({ row: candidate.row, reason: result.error.message });
+        }
+      });
+      completed += candidates.length;
+      input.onProgress?.({ completed, total });
+    }
+    if (completed < total) input.onProgress?.({ completed: total, total });
 
     failures.sort((left, right) => left.row - right.row);
     return {

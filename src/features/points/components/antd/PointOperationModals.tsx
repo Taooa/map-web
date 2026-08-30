@@ -1,4 +1,4 @@
-import { Alert, Descriptions, Form, Modal, Radio, Select, Statistic, Table } from 'antd';
+import { Alert, Descriptions, Form, Modal, Progress, Radio, Select, Statistic, Table } from 'antd';
 import { useState } from 'react';
 import type { Point } from '@/domain';
 import type { PointOperationScope } from '../../point-list-model';
@@ -31,22 +31,38 @@ export function TransformPointsModal({
   const [target, setTarget] = useState<EditableCoordinateSystem>('GCJ02');
   const [result, setResult] = useState<TransformPointsResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState({ completed: 0, total: scope.total });
   const unsupported = source === target || source === 'SHANGHAI2000' || target === 'SHANGHAI2000';
   async function submit() {
     setBusy(true);
-    const next = await pointService.transformPointsFrom(scope.pointIds, source, target);
-    setBusy(false);
-    setResult(next);
-    if (next.successCount)
-      onChanged(`坐标转换完成：成功 ${next.successCount} 条，失败 ${next.failureCount} 条。`);
+    setProgress({ completed: 0, total: scope.total });
+    try {
+      const next = await pointService.transformPointsFrom(
+        scope.pointIds,
+        source,
+        target,
+        setProgress,
+      );
+      setResult(next);
+      if (next.successCount)
+        onChanged(`坐标转换完成：成功 ${next.successCount} 条，失败 ${next.failureCount} 条。`);
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <Modal
-      afterClose={() => setResult(null)}
+      afterClose={() => {
+        setResult(null);
+        setProgress({ completed: 0, total: 0 });
+      }}
       cancelText="关闭"
       cancelButtonProps={{ 'aria-label': '关闭' }}
       destroyOnHidden
-      okButtonProps={{ disabled: unsupported || scope.total === 0 }}
+      okButtonProps={{
+        disabled: unsupported || scope.total === 0,
+        style: result ? { display: 'none' } : undefined,
+      }}
       okText="确认转换"
       onCancel={onClose}
       onOk={() => void submit()}
@@ -87,6 +103,16 @@ export function TransformPointsModal({
         <Alert title="上海2000只能保存和展示，不能生成正式转换结果。" showIcon type="warning" />
       )}
       {source === target && <Alert title="源坐标系和目标坐标系不能相同。" showIcon type="error" />}
+      {busy && (
+        <Progress
+          aria-label="转换进度"
+          percent={
+            progress.total === 0 ? 100 : Math.round((progress.completed / progress.total) * 100)
+          }
+          status="active"
+          format={() => `${progress.completed} / ${progress.total}`}
+        />
+      )}
       {result && (
         <div className="points-antd-operation-result">
           <div className="points-antd-statistics">

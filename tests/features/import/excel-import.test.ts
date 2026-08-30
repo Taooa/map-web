@@ -151,4 +151,39 @@ describe('Excel import', () => {
       ],
     });
   });
+
+  it('reports processed rows as import progress across storage batches', async () => {
+    const repository = new MemoryPointRepository();
+    let idSequence = 0;
+    const points = createPointService(repository, {
+      createId: () => `progress-point-${++idSequence}` as PointId,
+      now: () => timestamp,
+    });
+    const service = new ImportService(points, {
+      createImportId: () => importId,
+    });
+    const progress: { completed: number; total: number }[] = [];
+    const validRows = Array.from({ length: 201 }, (_, index) => [
+      `设备 ${index + 1}`,
+      120 + index / 10_000,
+      30 + index / 10_000,
+    ]);
+
+    const summary = await service.importExcelSheet({
+      sheet: createSheet([['无效设备', null, 31], ...validRows]),
+      mapping: { nameColumn: 0, longitudeColumn: 1, latitudeColumn: 2 },
+      system: 'WGS84',
+      onProgress: (next) => progress.push(next),
+    });
+
+    expect(progress).toEqual([
+      { completed: 1, total: 202 },
+      { completed: 201, total: 202 },
+      { completed: 202, total: 202 },
+    ]);
+    expect(summary).toMatchObject({
+      successCount: 201,
+      failureCount: 1,
+    });
+  });
 });

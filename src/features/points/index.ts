@@ -106,6 +106,7 @@ export type {
   PointServiceError,
   PointServiceErrorCode,
   PointServiceResult,
+  TransformPointsProgress,
   TransformPointsResult,
   UpdatePointInput,
 } from './point-service';

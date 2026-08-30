@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { pointService } from '@/features/points';
 import { renderRoute } from '@/test/render';
@@ -24,6 +24,7 @@ async function seedPoints(count: number) {
 describe('Ant Design point management', () => {
   beforeEach(clearPoints);
   afterEach(async () => {
+    vi.restoreAllMocks();
     delete document.documentElement.dataset.theme;
     await clearPoints();
   });
@@ -101,6 +102,9 @@ describe('Ant Design point management', () => {
     expect(within(transformDialog).getByText('已选择')).toBeVisible();
     await user.click(within(transformDialog).getByRole('button', { name: '确认转换' }));
     expect(await screen.findByText(/坐标转换完成：成功 1 条，失败 0 条/)).toBeVisible();
+    expect(
+      within(transformDialog).queryByRole('button', { name: '确认转换' }),
+    ).not.toBeInTheDocument();
     await user.click(within(transformDialog).getByRole('button', { name: '关闭' }));
 
     const row = screen.getByText('浦东机房 A-01').closest('tr');
@@ -124,9 +128,93 @@ describe('Ant Design point management', () => {
       target: { value: '[{"name":"JSON设备一","lng":121.4,"lat":31.2}]' },
     });
     await user.click(screen.getByRole('button', { name: '解析并预览' }));
-    expect(await screen.findByRole('combobox', { name: '点位名称字段' })).toBeVisible();
+    const importDialog = screen.getAllByRole('dialog').at(-1)!;
+    expect(
+      await within(importDialog).findByRole('combobox', { name: '点位名称字段' }),
+    ).toBeVisible();
+    expect(
+      within(importDialog).getByText((_, element) =>
+        element?.textContent === '待导入点位总数：1 条' ? true : false,
+      ),
+    ).toBeVisible();
+    expect(within(importDialog).getByText('点位名称')).toBeVisible();
+    expect(within(importDialog).getByText('经度')).toBeVisible();
+    expect(within(importDialog).getByText('纬度')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '确认导入' }));
     expect((await screen.findAllByText('JSON设备一')).length).toBeGreaterThan(0);
+  });
+
+  it('shows a loading state while an uploaded file is being parsed', async () => {
+    const user = userEvent.setup();
+    renderRoute('/points');
+    await screen.findByText('暂无点位，请先新增或导入。');
+    await user.click(screen.getByRole('button', { name: '新增点位' }));
+    await user.click(screen.getByRole('tab', { name: 'Upload' }));
+    const uploadDialog = screen.getAllByRole('dialog').at(-1)!;
+    const uploadInput = uploadDialog.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(uploadInput).not.toBeNull();
+
+    let resolveText: ((value: string) => void) | undefined;
+    const file = new File([], 'points.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', {
+      value: () =>
+        new Promise<string>((resolve) => {
+          resolveText = resolve;
+        }),
+    });
+
+    await user.upload(uploadInput!, file);
+    expect(await within(uploadDialog).findByText('正在解析文件...')).toBeVisible();
+    await act(async () => {
+      resolveText?.('名称,经度,纬度\n上传设备一,121.4,31.2');
+      await Promise.resolve();
+    });
+    expect(
+      await within(uploadDialog).findByText((_, element) =>
+        element?.textContent === '待导入点位总数：1 条' ? true : false,
+      ),
+    ).toBeVisible();
+  });
+
+  it('shows transform progress and hides the confirm button after completion', async () => {
+    const created = await pointService.createPoint({
+      name: '转换进度点位',
+      system: 'WGS84',
+      first: 121.4,
+      second: 31.2,
+    });
+    if (created.status !== 'success') throw new Error(created.error.message);
+    let finishTransform: (() => void) | undefined;
+    vi.spyOn(pointService, 'transformPointsFrom').mockImplementation(
+      (ids, _source, _target, onProgress) => {
+        onProgress?.({ completed: 0, total: ids.length });
+        return new Promise((resolve) => {
+          finishTransform = () => {
+            onProgress?.({ completed: ids.length, total: ids.length });
+            resolve({ total: ids.length, successCount: ids.length, failureCount: 0, failures: [] });
+          };
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderRoute('/points');
+    await screen.findByText('转换进度点位');
+    await user.click(screen.getByRole('checkbox', { name: '选择 转换进度点位' }));
+    await user.click(screen.getByRole('button', { name: '坐标转换' }));
+    const transformDialog = screen.getAllByRole('dialog').at(-1)!;
+    const confirm = within(transformDialog).getByRole('button', { name: '确认转换' });
+
+    await user.click(confirm);
+    expect(confirm).toHaveClass('ant-btn-loading');
+    expect(await within(transformDialog).findByLabelText('转换进度')).toHaveTextContent('0 / 1');
+    await act(async () => {
+      finishTransform?.();
+      await Promise.resolve();
+    });
+    expect(
+      within(transformDialog).queryByRole('button', { name: '确认转换' }),
+    ).not.toBeInTheDocument();
   });
 
   it('uses selected points before all points for batch deletion', async () => {
