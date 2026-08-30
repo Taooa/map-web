@@ -2408,6 +2408,49 @@ html[data-theme='dark'] .radix-alert-dialog {
   background: transparent;
 }
 
+.map-credential-modal .ant-modal-container {
+  display: flex;
+  max-height: 70vh;
+  max-height: 70dvh;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+.map-credential-modal .ant-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.map-credential-form > p {
+  margin: 0 0 20px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.map-credential-form__fields {
+  display: grid;
+  gap: 18px;
+}
+
+.map-credential-field {
+  display: grid;
+  gap: 8px;
+}
+
+.map-credential-field > span {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.map-credential-form__actions {
+  display: flex;
+  margin-top: 24px;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .map-workspace {
   --map-tone: #cb842b;
   --map-tone-soft: #fff1dc;

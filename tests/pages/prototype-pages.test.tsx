@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { IsoDateTime, Point, PointId } from '@/domain';
 import { pointService } from '@/features/points';
@@ -50,9 +50,14 @@ describe('visible page prototypes', () => {
     expect(screen.getByRole('combobox', { name: '地图平台切换' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '图层设置' }));
     expect(await screen.findByText('高德专属设置')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '配置密钥' }));
-    expect(screen.getByRole('dialog', { name: '配置密钥' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: '取消' }));
+    await user.click(screen.getByRole('button', { name: '地图 Key 配置' }));
+    const credentialDialog = screen.getByRole('dialog');
+    expect(credentialDialog).toBeVisible();
+    expect(within(credentialDialog).getByText('地图 Key 配置')).toBeVisible();
+    expect(screen.getByLabelText('高德地图 Key')).toBeVisible();
+    expect(screen.getByLabelText('百度地图 AK')).toBeVisible();
+    expect(screen.getByLabelText('天地图 Token')).toBeVisible();
+    await user.click(within(credentialDialog).getByRole('button', { name: /取\s*消/ }));
 
     const platformSelect = screen.getByRole('combobox', { name: '地图平台切换' });
     await user.click(platformSelect);
@@ -61,7 +66,7 @@ describe('visible page prototypes', () => {
       .find((element) => element.classList.contains('ant-select-item-option-content'));
     expect(baiduOption).toBeDefined();
     await user.click(baiduOption!);
-    expect(screen.getByRole('button', { name: '配置访问密钥' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '地图 Key 配置' })).toBeVisible();
   });
 
   it('opens Baidu in the same workspace with independent settings', async () => {
@@ -72,9 +77,9 @@ describe('visible page prototypes', () => {
     expect(await screen.findByRole('heading', { name: '请先配置访问密钥' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '图层设置' }));
     expect(await screen.findByText('百度专属设置')).toBeInTheDocument();
-    const configureButtons = screen.getAllByRole('button', { name: /配置访问密钥/ });
-    await user.click(configureButtons[0]!);
-    expect(screen.getByRole('dialog', { name: '配置访问密钥' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: '地图 Key 配置' }));
+    const credentialDialog = screen.getByRole('dialog');
+    expect(within(credentialDialog).getByText('地图 Key 配置')).toBeVisible();
   });
 
   it('opens Tianditu in the same workspace with independent settings', async () => {
@@ -84,9 +89,9 @@ describe('visible page prototypes', () => {
     expect(await screen.findByRole('heading', { name: '请先配置访问令牌' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '图层设置' }));
     expect(await screen.findByText('天地图专属设置')).toBeInTheDocument();
-    const configureButtons = screen.getAllByRole('button', { name: /配置访问令牌/ });
-    await user.click(configureButtons[0]!);
-    expect(screen.getByRole('dialog', { name: '配置访问令牌' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: '地图 Key 配置' }));
+    const credentialDialog = screen.getByRole('dialog');
+    expect(within(credentialDialog).getByText('地图 Key 配置')).toBeVisible();
   });
 
   it('loads the next point batch when the device list reaches the bottom', async () => {

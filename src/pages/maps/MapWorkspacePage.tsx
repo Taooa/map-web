@@ -7,7 +7,7 @@ import {
   RightOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import { Button, Popover, Select, Tooltip } from 'antd';
+import { Button, Input, Modal, Popover, Select, Tooltip } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { AMapAdapter } from '@/adapters/maps/amap/amap-adapter';
 import { AMapToolbar } from '@/adapters/maps/amap/AMapToolbar';
@@ -25,6 +25,15 @@ import { pointService } from '@/features/points';
 type Platform = 'amap' | 'baidu' | 'tianditu';
 type Status = 'missing-credential' | 'loading' | 'ready' | 'error';
 const MAP_POINT_PAGE_SIZE = 50;
+const credentialFields: ReadonlyArray<{
+  platform: Platform;
+  label: string;
+  placeholder: string;
+}> = [
+  { platform: 'amap', label: '高德地图 Key', placeholder: '请输入高德地图 Key' },
+  { platform: 'baidu', label: '百度地图 AK', placeholder: '请输入百度地图 AK' },
+  { platform: 'tianditu', label: '天地图 Token', placeholder: '请输入天地图 Token' },
+];
 
 const platforms = {
   amap: {
@@ -283,9 +292,9 @@ export function MapWorkspacePage() {
           >
             <Button aria-label="图层设置" icon={<AppstoreOutlined />} shape="circle" />
           </Popover>
-          <Tooltip title={credential ? `修改${config.credential}` : `配置${config.credential}`}>
+          <Tooltip title="地图 Key 配置">
             <Button
-              aria-label={`配置${config.credential}`}
+              aria-label="地图 Key 配置"
               className={credential ? 'is-configured' : ''}
               icon={<SettingOutlined />}
               onClick={() => setCredentialDialog(true)}
@@ -419,12 +428,15 @@ export function MapWorkspacePage() {
 
       {credentialDialog && (
         <CredentialDialog
-          label={config.credential}
-          initialValue={credential}
+          initialValues={credentials}
           onCancel={() => setCredentialDialog(false)}
-          onSave={(value) => {
-            localStorage.setItem(config.storage, value);
-            setCredentials((current) => ({ ...current, [platform]: value }));
+          onSave={(values) => {
+            (Object.keys(platforms) as Platform[]).forEach((item) => {
+              const value = values[item].trim();
+              if (value) localStorage.setItem(platforms[item].storage, value);
+              else localStorage.removeItem(platforms[item].storage);
+            });
+            setCredentials(values);
             setCredentialDialog(false);
           }}
         />
@@ -434,52 +446,61 @@ export function MapWorkspacePage() {
 }
 
 function CredentialDialog({
-  label,
-  initialValue,
+  initialValues,
   onCancel,
   onSave,
 }: {
-  label: string;
-  initialValue: string;
+  initialValues: Record<Platform, string>;
   onCancel: () => void;
-  onSave: (value: string) => void;
+  onSave: (values: Record<Platform, string>) => void;
 }) {
-  const [value, setValue] = useState(initialValue);
+  const [values, setValues] = useState(initialValues);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (value.trim()) onSave(value.trim());
+    onSave({
+      amap: values.amap.trim(),
+      baidu: values.baidu.trim(),
+      tianditu: values.tianditu.trim(),
+    });
   }
   return (
-    <div className="overlay overlay--center" onMouseDown={onCancel}>
-      <section
-        aria-label={`配置${label}`}
-        aria-modal="true"
-        className="prototype-dialog map-dialog"
-        onMouseDown={(event) => event.stopPropagation()}
-        role="dialog"
-      >
-        <h2>配置{label}</h2>
-        <form onSubmit={submit}>
-          <label className="form-field">
-            <span>{label}</span>
-            <input
-              autoFocus
-              onChange={(event) => setValue(event.target.value)}
-              required
-              type="password"
-              value={value}
-            />
-          </label>
-          <div className="prototype-dialog__actions">
-            <button onClick={onCancel} type="button">
-              取消
-            </button>
-            <button disabled={!value.trim()} type="submit">
-              保存并加载
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+    <Modal
+      centered
+      className="map-credential-modal"
+      footer={null}
+      onCancel={onCancel}
+      open
+      title="地图 Key 配置"
+      width={520}
+    >
+      <form className="map-credential-form" onSubmit={submit}>
+        <p>统一维护三个地图平台的访问凭据，保存后当前平台会按需重新加载。</p>
+        <div className="map-credential-form__fields">
+          {credentialFields.map((field, index) => (
+            <label className="map-credential-field" key={field.platform}>
+              <span>{field.label}</span>
+              <Input.Password
+                aria-label={field.label}
+                autoFocus={index === 0}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    [field.platform]: event.target.value,
+                  }))
+                }
+                placeholder={field.placeholder}
+                value={values[field.platform]}
+              />
+            </label>
+          ))}
+        </div>
+        <div className="map-credential-form__actions">
+          <Button onClick={onCancel}>取消</Button>
+          <Button htmlType="submit" type="primary">
+            保存配置
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
