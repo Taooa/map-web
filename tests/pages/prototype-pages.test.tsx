@@ -67,6 +67,16 @@ describe('visible page prototypes', () => {
     expect(baiduOption).toBeDefined();
     await user.click(baiduOption!);
     expect(screen.getByRole('button', { name: '地图 Key 配置' })).toBeVisible();
+
+    await user.click(platformSelect);
+    const tiandituOption = screen
+      .getAllByText('天地图')
+      .find((element) => element.classList.contains('ant-select-item-option-content'));
+    expect(tiandituOption).toBeDefined();
+    await user.click(tiandituOption!);
+    expect(screen.getByLabelText('地图工具')).toBeVisible();
+    expect(screen.getByLabelText('基础地图控制')).toBeVisible();
+    expect(screen.getByRole('button', { name: '地图 Key 配置' })).toBeVisible();
   });
 
   it('opens Baidu in the same workspace with independent settings', async () => {

@@ -2349,9 +2349,11 @@ html[data-theme='dark'] .radix-alert-dialog {
 
 .unified-map-container {
   position: absolute;
+  z-index: 0;
   width: 100%;
   height: 100%;
   inset: 0;
+  isolation: isolate;
 }
 
 .unified-map-tools-top,
@@ -2361,9 +2363,8 @@ html[data-theme='dark'] .radix-alert-dialog {
   display: flex;
   border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  background: var(--color-surface);
   box-shadow: 0 10px 28px rgba(24, 55, 73, 0.13);
-  backdrop-filter: blur(8px);
 }
 
 .unified-map-tools-top {
