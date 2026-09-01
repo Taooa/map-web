@@ -1,7 +1,7 @@
 # 当前项目上下文
 
 > 项目：地图工具（Coordinate Toolkit）
-> 快照日期：2026-08-02
+> 快照日期：2026-09-01
 > 事实来源：当前工作区源码、依赖、测试和 Git 状态。本文替代此前同名文档中的过期状态。
 
 ## 产品定位
@@ -17,8 +17,10 @@ Coordinate Toolkit 是一个浏览器本地运行的设备点位管理、坐标�
 - 表格支持固定列、内部滚动、创建/更新时间排序、外部分页和跨页选择；
 - 新增支持表单、Excel/CSV/JSON 上传及 JSON 粘贴映射；
 - 编辑、转换、导出、单条/批量删除已使用 Ant Design Drawer、Modal、Popconfirm；
-- 地图仍是单一工作台，通过 `platform` 查询参数切换平台；
-- 25 个测试文件、106 项测试通过。
+- 地图是全尺寸单一工作台，通过 `platform` 查询参数切换平台；左侧点位面板、右上工具区和右下基础控制均为地图 Overlay；
+- 地图点位已拆分为仓库全集、当前工作区和当前可见 Marker 三层状态；添加弹窗支持名称/来源筛选、分页、跨页选择和全选全部查询结果；
+- 添加候选表格展示 WGS84、GCJ02、BD09 坐标可用性，已在工作区的点位不再出现；
+- 25 个测试文件、113 项测试通过。
 
 ## 当前架构
 
@@ -35,6 +37,8 @@ Adapter / Storage
 ```
 
 点位页面只负责编排页面状态和对话框；查询、排序、分页、范围解析在 points feature；业务约束在 PointService；持久化通过 PointRepository 进入 IndexedDB，失败时降级 MemoryRepository；坐标算法与地图平台能力留在各自 Adapter/Service。
+
+地图工作区在 Page 层维护 `workspacePointIds`、其子集 `visiblePointIds` 和唯一 `pointCache`。Marker 仅从当前平台可用的可见 Point 生成；平台切换只重建平台 Adapter，不改变工作区成员和显示意图。PointRepository 的分页结果提供完整来源选项和当前查询的 PointId 范围，弹窗只加载当前页完整 Point。
 
 Ant Design 在 `src/app/AntdProvider.tsx` 统一接入 `ConfigProvider`、中文 locale、`App` 上下文和 PeachTools 明暗主题。业务通知通过 `App.useApp()` 调用，不使用静态 message API。
 
@@ -75,7 +79,11 @@ Ant Design 在 `src/app/AntdProvider.tsx` 统一接入 `ConfigProvider`、中文
   → PointRepository
   → IndexedDB（失败时 MemoryRepository）
   → PointsPageAntd 查询与选择
-  → 转换缓存 / Excel 或 JSON 导出 / MapWorkspacePage
+  → 转换缓存 / Excel 或 JSON 导出
+  → MapWorkspacePage 候选查询
+  → workspacePointIds
+  → visiblePointIds
+  → 平台 Marker
 ```
 
 Point 坐标规则：
@@ -97,6 +105,9 @@ Point 坐标规则：
 - 新增、编辑、转换、Excel/JSON 导出、单条与批量删除；
 - WGS84、GCJ02、BD09 转换和缓存；
 - 高德、百度、天地图单一地图工作台与最小 MapAdapter；
+- 全尺寸地图、可收起左侧悬浮点位面板、右上工具区和右下基础控制区；
+- 当前地图点位工作区、候选排除、名称/来源筛选、分页与跨页选择；
+- WGS84、GCJ02、BD09 坐标可用性展示，以及工作区/Marker 显隐独立控制；
 - 点位、仓储、坐标、地图生命周期、页面和路由自动化测试。
 
 ## 未完成模块
@@ -106,6 +117,9 @@ Point 坐标规则：
 - 真实浏览器中的 Excel/JSON 下载、超大文件和窄屏视觉验收；
 - 大数据量导入/转换的 Worker、进度和取消能力；
 - 地图真实凭据下的跨平台发布验收；
+- 三个平台 Toolbar 目前仍以轻量 UI 设置和 localStorage 保存为主，尚未全部接通真实图层能力；
+- POI 搜索和更完整的地图工具尚未进入当前阶段；
+- 大规模工作区全部显示时的 Marker 性能与聚合策略尚未建立基线；
 - 主包体积优化：Ant Design 接入后主 JS 超过 Vite 500 kB 告警阈值；
 - `src/styles/globals.css` 中仍有部分历史点位样式，因与地图共享选择器交叉，需先逐条确认归属再安全删除。
 
@@ -135,18 +149,20 @@ Point 坐标规则：
 
 ## 下一步建议
 
-1. 在真实 Chrome/Edge 中逐项验收点位新增、跨页选择、转换、下载和批量删除，并补截图或验收记录。
-2. 按路由或页面粒度延迟加载 Ant Design 点位页，评估主包拆分，禁止为减包体重构业务架构。
-3. 使用 10,000 点样本验证导入、表格滚动、转换与导出性能，再决定是否引入 Worker。
-4. 对 `globals.css` 的历史点位选择器逐条做引用证明，只删除确认无共享使用的规则。
-5. 上海2000继续保持“保存/展示但不转换”，待权威资料和基线测试齐备后单独评审。
+1. 使用真实高德、百度和天地图凭据验收工作区添加、Marker 显隐、Popup、fitView、平台切换和浮层稳定性。
+2. 使用大数据样本验证“全选全部查询结果”的 ID 内存占用，以及大量 Marker 同时显示的 SDK 性能，再决定是否需要平台内聚合能力。
+3. 后续按既定阶段分别评审真实图层能力和 POI 搜索，不扩大公共 MapAdapter。
+4. 按路由或页面粒度评估主包拆分，禁止为减包体重构业务架构。
+5. 对 `globals.css` 的历史点位选择器逐条做引用证明，只删除确认无共享使用的规则。
+6. 上海2000继续保持“保存/展示但不转换”，待权威资料和基线测试齐备后单独评审。
 
 ## 当前验证快照
 
-- `pnpm install --frozen-lockfile`：通过，锁文件无需更新；
-- `pnpm build`：通过；主 JS 1,332,900 bytes，CSS 59,789 bytes，dist 总计 3,996,250 bytes；
+- Node：桌面工作区运行时 `v24.19.0`，满足 `>=22.17.0`；
+- pnpm：当前命令版本 `11.19.0`，满足 `>=11.17.0`；项目 `packageManager` 仍固定为 `pnpm@11.17.0`；
+- `pnpm build`：通过；主 JS 约 1,352.57 kB，CSS 约 65.20 kB，保留 Vite 大分块提示；
 - `pnpm typecheck`：通过；
 - `pnpm lint`：通过；
-- `pnpm test:run`：25 个文件、106 项测试全部通过；
-- 全仓 `pnpm format:check`：未通过，17 个文件存在既有格式差异；本轮文件已定向格式化；
-- `pnpm why` 三个旧依赖无输出：TanStack Table 与两项 Radix UI 依赖已不在依赖树。
+- `pnpm test:run`：25 个文件、113 项测试全部通过；
+- 本轮修改文件 Prettier 检查通过；
+- `git diff --check`：通过，仅有 Git 的 LF/CRLF 行尾转换提示。

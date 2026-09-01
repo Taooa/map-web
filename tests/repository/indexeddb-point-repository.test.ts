@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { IndexedDbClient, IndexedDBPointRepository } from '@/adapters/storage';
-import type { IsoDateTime, Point, PointId } from '@/domain';
+import type { ImportRecordId, IsoDateTime, Point, PointId } from '@/domain';
 import { getPointStorageStatus, initializePointStorage, pointService } from '@/features/points';
 
 const timestamp = '2026-07-29T10:00:00.000Z' as IsoDateTime;
@@ -42,7 +42,9 @@ describe('IndexedDBPointRepository', () => {
     expect(database.name).toBe('coordinate-toolkit');
     expect(database.version).toBe(2);
     expect(database.objectStoreNames.contains('points')).toBe(true);
-    expect(database.transaction('points').objectStore('points').indexNames.contains('updatedAt')).toBe(true);
+    expect(
+      database.transaction('points').objectStore('points').indexNames.contains('updatedAt'),
+    ).toBe(true);
     await client.close();
   });
 
@@ -54,12 +56,39 @@ describe('IndexedDBPointRepository', () => {
       updatedAt: `2026-07-29T10:${String(index % 60).padStart(2, '0')}:00.000Z` as IsoDateTime,
     }));
     await repository.createMany(points);
-    const result = await repository.listPage({ offset: 40, limit: 20, sortField: 'updatedAt', sortDirection: 'desc' });
+    const result = await repository.listPage({
+      offset: 40,
+      limit: 20,
+      sortField: 'updatedAt',
+      sortDirection: 'desc',
+    });
     expect(result.status).toBe('success');
     if (result.status === 'success') {
       expect(result.value.points).toHaveLength(20);
       expect(result.value.total).toBe(120);
       expect(result.value.pointIds).toHaveLength(120);
+    }
+    await client.close();
+  });
+
+  it('returns every available source option for an unfiltered page', async () => {
+    const { client, repository } = setup();
+    const imported: Point = {
+      ...point('imported-source'),
+      source: {
+        type: 'import',
+        format: 'csv',
+        importId: 'source-import' as ImportRecordId,
+        sourceName: 'CSV 批次',
+      },
+    };
+    await repository.createMany([point('manual-source'), imported]);
+
+    const result = await repository.listPage({ offset: 0, limit: 1 });
+    expect(result.status).toBe('success');
+    if (result.status === 'success') {
+      expect(result.value.points).toHaveLength(1);
+      expect(result.value.sourceOptions).toEqual(['手动输入', 'CSV 批次']);
     }
     await client.close();
   });

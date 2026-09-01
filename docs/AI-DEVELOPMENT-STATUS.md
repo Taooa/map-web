@@ -1,43 +1,43 @@
 # AI Development Status
 
 > 项目：地图工具（Coordinate Toolkit）
-> 检查日期：2026-08-02
+> 检查日期：2026-09-01
 > 状态依据：当前工作区，不以历史计划中的过期描述代替源码事实。
 
 ## 项目状态
 
-项目处于真实功能维护阶段。点位管理已从自定义表格、TanStack Table 和 Radix UI 全面切换到 Ant Design 6；坐标、仓储和地图架构未重构。
+项目处于真实功能维护阶段。点位管理已全面切换到 Ant Design 6；地图展示页已完成全尺寸地图、悬浮工具区和当前地图点位工作区。本轮继续沿用既有坐标、仓储、Service、Repository 与地图 Adapter 架构。
 
 ## 当前版本
 
 - 应用版本：`0.1.0`
-- Node：桌面内置 `v24.14.0`，满足 `>=22.17.0`
-- pnpm：`11.17.0`，满足项目要求
+- Node：桌面工作区运行时 `v24.19.0`，满足 `>=22.17.0`
+- pnpm：当前命令版本 `11.19.0`，满足 `>=11.17.0`；项目声明仍为 `pnpm@11.17.0`
 - React：`19.2.8`
 - Ant Design：`6.5.3`
 - `@ant-design/icons`：`6.3.2`
 
 ## 当前 Git Commit
 
-- 分支：`main`
-- Commit：`4dd874456d6e65f9586679ac887729420f46be71`
-- 时间：`2026-07-31T14:18:57+08:00`
-- 说明：`✨ feat(0.0.8：点位管理): 功能优化`
+- 分支：`dev`
+- Commit：`eb5def37a9e1d0ff3c6e98e415d17a5833266396`
+- 时间：`2026-09-01T18:37:16+08:00`
+- 说明：`fix(map): stabilize floating controls on layer changes`
 
 ## 当前未提交修改
 
-工作区不干净，且本轮开始前已经存在领域、Repository、PointService、列表模型、文档和测试改动。本轮保留并继续集成，没有执行 reset、clean、checkout 覆盖，也没有删除无关未跟踪文件。
+工作区不干净，当前未提交内容属于地图点位工作区、添加弹窗优化、IndexedDB 来源选项修正及对应文档和测试。本轮没有执行 reset、clean、checkout 覆盖，也没有删除未跟踪文件。
 
-本轮 Ant Design 迁移的主要文件：
+当前修改文件：
 
-- `src/app/AntdProvider.tsx`、`src/app/App.tsx`、`src/app/router.tsx`；
-- `src/pages/PointsPageAntd.tsx`；
-- `src/features/points/components/antd/*`；
-- `src/features/points/point-export.ts`、`points-antd.css`；
-- `src/test/render.tsx`、`src/test/setup.ts`、`tests/pages/points-antd.test.tsx`；
-- `package.json`、`pnpm-lock.yaml`、README 与 V2 文档。
-
-已删除的旧点位 UI 包括旧 `PointsPage.tsx`、`PointTable.tsx`、旧列表控制测试，以及 points/components 下旧的 TanStack/Radix 表格、分页、复选框和删除弹窗实现。
+- `src/pages/maps/MapWorkspacePage.tsx`；
+- `src/styles/globals.css`；
+- `src/adapters/storage/indexeddb/indexeddb-point-repository.ts`；
+- `tests/pages/prototype-pages.test.tsx`；
+- `tests/repository/indexeddb-point-repository.test.ts`；
+- `docs/Coordinate-Toolkit-PRD-V2.md`、`docs/Coordinate-Toolkit-TASKS-V2.md`；
+- `docs/CURRENT-PROJECT-CONTEXT.md`、`docs/AI-DEVELOPMENT-STATUS.md`。
+- `README.md`。
 
 ## 当前已完成能力
 
@@ -49,32 +49,39 @@
 - 已选择 > 查询结果 > 全部数据的统一操作范围；
 - WGS84、GCJ02、BD09 正式转换，上海2000仅保存展示，CGCS2000不开放；
 - Excel 代码动态加载，避免把 xlsx 合并进主入口包；
-- 25 个测试文件、106 项测试通过。
+- 全尺寸地图主体、可收起左侧点位 Overlay、右上工具区和右下基础控制区；
+- 三平台 Key 合并配置、平台切换和当前平台 Toolbar Popover；
+- `workspacePointIds`、`visiblePointIds`、`pointCache` 三层地图工作区状态；
+- 添加点位候选排除、名称/来源筛选、分页、跨页选择和全选全部查询结果；
+- 候选表格展示 WGS84、GCJ02、BD09 坐标“有/无”，仅表格内容可滚动且隐藏滚动条；
+- 左侧 Marker 显隐、单点移出、全部显示、清空显示和清空列表；
+- 25 个测试文件、113 项测试通过。
 
 ## 当前开发中的功能
 
-Ant Design 代码迁移已完成并通过自动化门禁，当前剩余工作主要是人工验收和性能收口：
+地图工作区 V1 和添加点位弹窗优化已完成并通过自动化门禁，当前剩余工作主要是人工验收和后续地图能力分阶段开发：
 
-- 真实浏览器下载、上传和无障碍操作验证；
-- 大数据量测试；
-- 主包拆分评估；
-- 安全清理全局 CSS 中有共享风险的历史点位规则。
+- 真实地图凭据下验证三平台 Marker、Popup、fitView 和浮层稳定性；
+- 大数据量全选、工作区缓存和 Marker 渲染测试；
+- 平台真实图层能力和 POI 搜索尚未进入当前实现；
+- 主包拆分评估与历史 CSS 安全清理。
 
 ## 当前风险
 
-- 主 JS 从迁移前 884,644 bytes 增至 1,332,900 bytes，增加 448,256 bytes（约 50.7%）；dist 总量从 3,117,179 增至 3,996,250 bytes，增加 879,071 bytes（约 28.2%）。Vite 构建成功但产生大分块警告。
-- 全仓 Prettier 检查仍有 17 个既有格式差异，主要位于地图、坐标服务和旧测试；为保护未提交代码，本轮未执行全仓写入格式化。
+- 当前主 JS 约 1,352.57 kB，Vite 构建成功但仍产生大分块警告。
+- “全选全部”只保存 PointId，但超大查询结果仍会产生 O(N) ID 内存；全部显示大量 Marker 时性能主要受各地图 SDK 限制。
+- IndexedDB 为生成完整来源下拉选项需要扫描点位来源；当前不物化全部 Point 到页面，但大数据量下仍需建立耗时基线。
 - `globals.css` 中历史点位样式与地图共享选择器存在交叉，不能用宽泛正则整段删除。
 - 上海2000缺少权威转换基线，不得误标为正式转换能力。
-- 工作区改动范围较大，提交前需要人工复核哪些属于迁移前在途代码。
+- 当前地图状态仅保存在页面会话中，刷新后不会恢复工作区点位，这是 V1 当前行为。
 
 ## 下一步建议
 
-1. 真实浏览器验收 `/points` 全流程，重点检查跨页选择、横向滚动、弹窗重置和下载文件。
-2. 对点位页进行页面级延迟加载实验并对比包体，保持业务与架构不变。
-3. 建立 10,000 点导入/转换/导出性能基线。
-4. 单独安排全仓格式化或逐文件清理，避免与当前脏工作区混在同一提交。
-5. 提交前按迁移前/本轮改动来源拆分审阅，不自动丢弃任何文件。
+1. 使用真实三平台凭据验收工作区添加、显隐、Popup、fitView、平台切换和浮层稳定性。
+2. 使用 1,000/10,000 点样本建立候选查询、全选、缓存和 Marker 渲染基线。
+3. 后续按独立阶段实现真实图层能力和 POI 搜索，不修改公共 MapAdapter。
+4. 评估页面级代码拆分，保持现有业务和架构不变。
+5. 提交前复核当前十个修改文件，不自动丢弃任何内容。
 
 ## 禁止修改范围
 
@@ -89,13 +96,11 @@ Ant Design 代码迁移已完成并通过自动化门禁，当前剩余工作主
 
 | 检查 | 结果 |
 | --- | --- |
-| Node | `v24.14.0`，通过 |
-| pnpm | `11.17.0`，通过 |
-| `pnpm install --frozen-lockfile` | 通过，Already up to date |
+| Node | `v24.19.0`，通过 |
+| pnpm | `11.19.0`，满足项目最低版本；项目声明为 `pnpm@11.17.0` |
 | `pnpm build` | 通过，存在主包体积警告 |
 | `pnpm typecheck` | 通过 |
 | `pnpm lint` | 通过，0 warning |
-| `pnpm test:run` | 25 files / 106 tests 通过 |
-| 迁移文件定向 Prettier | 通过 |
-| 全仓 `pnpm format:check` | 未通过：17 个既有格式差异 |
-| 旧依赖 `pnpm why` | 无输出，已移除 |
+| `pnpm test:run` | 25 files / 113 tests 通过 |
+| 本轮文件 Prettier | 通过 |
+| `git diff --check` | 通过，仅有 LF/CRLF 转换提示 |
