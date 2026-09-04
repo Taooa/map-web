@@ -1,8 +1,4 @@
-import type {
-  MapPointActivateHandler,
-  MapRenderGroup,
-  MapRenderPoint,
-} from '../map-adapter';
+import type { MapPointActivateHandler, MapRenderGroup, MapRenderPoint } from '../map-adapter';
 import {
   createMarkerDetailContent,
   createMarkerHoverContent,
@@ -86,7 +82,16 @@ export class TiandituMap {
   }
 
   fitView(): void {
-    if (this.#positions.length > 0) this.#map.centerAndZoom(this.#positions[0]!, 15);
+    const firstPosition = this.#positions[0];
+    if (!firstPosition) return;
+    if (this.#positions.length === 1) {
+      this.#map.centerAndZoom(firstPosition, 15);
+      return;
+    }
+
+    const bounds = new this.#sdk.LngLatBounds(firstPosition, firstPosition);
+    this.#positions.slice(1).forEach((position) => bounds.extend(position));
+    this.#map.setViewport(this.#map.getViewport(bounds));
   }
 
   clear(): void {

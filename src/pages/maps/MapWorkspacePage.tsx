@@ -23,25 +23,21 @@ import {
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useSearchParams } from 'react-router-dom';
-import { AMapAdapter } from '@/adapters/maps/amap/amap-adapter';
 import { AMapToolbar } from '@/adapters/maps/amap/AMapToolbar';
-import { BaiduAdapter } from '@/adapters/maps/baidu/baidu-adapter';
 import { BaiduToolbar } from '@/adapters/maps/baidu/BaiduToolbar';
+import { createMapAdapter, type MapPlatform } from '@/adapters/maps/map-adapter-factory';
 import type {
   MapAdapter,
   MapPointActivateHandler,
   MapRenderPoint,
 } from '@/adapters/maps/map-adapter';
 import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
-import { TiandituAdapter } from '@/adapters/maps/tianditu/tianditu-adapter';
+import { createMapRenderPoint } from '@/adapters/maps/map-render-point';
 import { TiandituToolbar } from '@/adapters/maps/tianditu/TiandituToolbar';
-import type { CoordinateSystemId, Point, PointId } from '@/domain';
-import { createAMapMarkerData } from '@/features/map-validation/amap-map-service';
-import { createBaiduMarkerData } from '@/features/map-validation/baidu-map-service';
-import { createTiandituMarkerData } from '@/features/map-validation/tianditu-map-service';
+import type { CoordinateSystemId, GeographicCoordinateSystemId, Point, PointId } from '@/domain';
 import { pointService } from '@/features/points';
 
-type Platform = 'amap' | 'baidu' | 'tianditu';
+type Platform = MapPlatform;
 type Status = 'missing-credential' | 'loading' | 'ready' | 'error';
 const MAP_POINT_PAGE_SIZE = 20;
 const MAP_VISIBLE_POINT_BATCH_SIZE = 50;
@@ -76,25 +72,18 @@ const platforms = {
     credential: '访问令牌',
     storage: 'coordinate-toolkit.tianditu-token',
   },
-} as const;
+} as const satisfies Record<
+  Platform,
+  {
+    name: string;
+    coordinate: GeographicCoordinateSystemId;
+    credential: string;
+    storage: string;
+  }
+>;
 
 function isPlatform(value: string | null): value is Platform {
   return value === 'amap' || value === 'baidu' || value === 'tianditu';
-}
-
-function createAdapter(
-  platform: Platform,
-  onActivatePoint: MapPointActivateHandler,
-): MapAdapter {
-  if (platform === 'amap') return new AMapAdapter(undefined, onActivatePoint);
-  if (platform === 'baidu') return new BaiduAdapter(undefined, onActivatePoint);
-  return new TiandituAdapter(undefined, onActivatePoint);
-}
-
-function toRenderPoint(platform: Platform, point: Point): MapRenderPoint | null {
-  if (platform === 'amap') return createAMapMarkerData(point);
-  if (platform === 'baidu') return createBaiduMarkerData(point);
-  return createTiandituMarkerData(point);
 }
 
 function pointSourceName(point: Point): string {
@@ -184,7 +173,9 @@ export function MapWorkspacePage() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !credential) return;
-    const adapter = createAdapter(platform, (pointId) => activatePointFromMapRef.current(pointId));
+    const adapter = createMapAdapter(platform, {
+      onPointActivate: (pointId) => activatePointFromMapRef.current(pointId),
+    });
     adapterRef.current?.destroy();
     adapterRef.current = adapter;
     let active = true;
@@ -240,8 +231,7 @@ export function MapWorkspacePage() {
       setVisiblePointCount((current) =>
         Math.max(
           current,
-          Math.ceil((pointIndex + 1) / MAP_VISIBLE_POINT_BATCH_SIZE) *
-            MAP_VISIBLE_POINT_BATCH_SIZE,
+          Math.ceil((pointIndex + 1) / MAP_VISIBLE_POINT_BATCH_SIZE) * MAP_VISIBLE_POINT_BATCH_SIZE,
         ),
       );
     };
@@ -253,12 +243,12 @@ export function MapWorkspacePage() {
     visiblePointIds.forEach((pointId) => {
       const point = pointCache.get(pointId);
       if (!point) return;
-      const marker = toRenderPoint(platform, point);
+      const marker = createMapRenderPoint(point, config.coordinate);
       if (marker) markers.push(marker);
       else missing.push(point);
     });
     return { markers, missing };
-  }, [platform, pointCache, visiblePointIds]);
+  }, [config.coordinate, pointCache, visiblePointIds]);
 
   const missingCoordinateMessage = display.missing.length
     ? `${display.missing.map((point) => point.name).join('、')} 需要先转换为 ${config.coordinate}。`
@@ -276,7 +266,7 @@ export function MapWorkspacePage() {
     const pendingFocusPointId = pendingFocusPointIdRef.current;
     if (pendingFocusPointId) {
       const point = pointCache.get(pendingFocusPointId);
-      const marker = point ? toRenderPoint(platform, point) : null;
+      const marker = point ? createMapRenderPoint(point, config.coordinate) : null;
       if (marker) adapter?.focusPoint(marker.position);
       pendingFocusPointIdRef.current = null;
       pendingFitViewRef.current = false;
@@ -284,7 +274,7 @@ export function MapWorkspacePage() {
       adapter?.fitView();
       pendingFitViewRef.current = false;
     }
-  }, [markerGroups, platform, pointCache, status]);
+  }, [config.coordinate, markerGroups, pointCache, status]);
 
   useEffect(() => {
     const pointId = pendingScrollPointIdRef.current;

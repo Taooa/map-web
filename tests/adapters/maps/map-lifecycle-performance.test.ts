@@ -140,6 +140,9 @@ function createBaiduSdk(state: Counters): BaiduMapSdk {
 
 function createTiandituSdk(state: Counters): TiandituMapSdk {
   class LngLat {}
+  class LngLatBounds {
+    extend(): void {}
+  }
   class Point {}
   class Icon {}
   class Marker implements TiandituMarkerInstance {
@@ -154,6 +157,8 @@ function createTiandituSdk(state: Counters): TiandituMapSdk {
     }
     centerAndZoom(): void {}
     getZoom(): number { return 11; }
+    getViewport(): object { return {}; }
+    setViewport(): void {}
     enableScrollWheelZoom(): void {}
     enableDoubleClickZoom(): void {}
     addOverLay(): void { state.overlays += 1; }
@@ -161,7 +166,7 @@ function createTiandituSdk(state: Counters): TiandituMapSdk {
     openInfoWindow(): void {}
     closeInfoWindow(): void {}
   }
-  return { Map: MapInstance, LngLat, Point, Icon, Marker, InfoWindow };
+  return { Map: MapInstance, LngLat, LngLatBounds, Point, Icon, Marker, InfoWindow };
 }
 
 describe.each([100, 1000, 5000])('地图覆盖物生命周期：%i 个点', (size) => {
@@ -246,15 +251,15 @@ describe('连续创建和销毁地图实例', () => {
     const tiandituLoad = new Promise<TiandituMapSdk>((resolve) => { resolveTianditu = resolve; });
     const adapters = [
       {
-        adapter: new AMapAdapter(() => amapLoad),
+        adapter: new AMapAdapter({}, () => amapLoad),
         resolve: () => resolveAMap(createAMapSdk(amapState)),
       },
       {
-        adapter: new BaiduAdapter(() => baiduLoad),
+        adapter: new BaiduAdapter({}, () => baiduLoad),
         resolve: () => resolveBaidu(createBaiduSdk(baiduState)),
       },
       {
-        adapter: new TiandituAdapter(() => tiandituLoad),
+        adapter: new TiandituAdapter({}, () => tiandituLoad),
         resolve: () => resolveTianditu(createTiandituSdk(tiandituState)),
       },
     ];

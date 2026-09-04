@@ -1,5 +1,9 @@
 export type TiandituLngLatInstance = object;
+export interface TiandituLngLatBoundsInstance {
+  extend(position: TiandituLngLatInstance): void;
+}
 export type TiandituInfoWindowInstance = object;
+export type TiandituViewport = object;
 
 export interface TiandituMarkerInstance {
   addEventListener(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
@@ -10,6 +14,8 @@ export interface TiandituMapInstance {
   centerAndZoom(position: TiandituLngLatInstance, zoom: number): void;
   panTo?(position: TiandituLngLatInstance): void;
   getZoom(): number;
+  getViewport(bounds: TiandituLngLatBoundsInstance): TiandituViewport;
+  setViewport(viewport: TiandituViewport): void;
   enableScrollWheelZoom(): void;
   enableDoubleClickZoom(): void;
   addOverLay(marker: TiandituMarkerInstance): void;
@@ -27,6 +33,10 @@ export interface TiandituMapSdk {
   }) => object;
   readonly Map: new (container: HTMLElement) => TiandituMapInstance;
   readonly LngLat: new (lng: number, lat: number) => TiandituLngLatInstance;
+  readonly LngLatBounds: new (
+    southwest: TiandituLngLatInstance,
+    northeast: TiandituLngLatInstance,
+  ) => TiandituLngLatBoundsInstance;
   readonly Marker: new (
     position: TiandituLngLatInstance,
     options?: { readonly icon: object },
@@ -54,6 +64,7 @@ function isSdkReady(sdk: TiandituMapSdk | undefined): sdk is TiandituMapSdk {
     sdk &&
       typeof sdk.Map === 'function' &&
       typeof sdk.LngLat === 'function' &&
+      typeof sdk.LngLatBounds === 'function' &&
       typeof sdk.Marker === 'function' &&
       typeof sdk.InfoWindow === 'function',
   );

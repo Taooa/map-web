@@ -8,6 +8,7 @@ function createSdk(): TiandituMapSdk {
   return {
     Map: class {},
     LngLat: class {},
+    LngLatBounds: class {},
     Marker: class {},
     InfoWindow: class {},
   } as unknown as TiandituMapSdk;

@@ -15,6 +15,10 @@ export interface MapRenderGroup {
 
 export type MapPointActivateHandler = (pointId: string) => void;
 
+export interface MapAdapterOptions {
+  readonly onPointActivate?: MapPointActivateHandler;
+}
+
 export interface MapAdapter {
   mount(container: HTMLElement, credential: string): Promise<void>;
   setPoints(groups: readonly MapRenderGroup[]): void;

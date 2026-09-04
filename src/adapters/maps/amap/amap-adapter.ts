@@ -1,5 +1,6 @@
 import type {
   MapAdapter,
+  MapAdapterOptions,
   MapPointActivateHandler,
   MapRenderGroup,
 } from '../map-adapter';
@@ -13,11 +14,11 @@ export class AMapAdapter implements MapAdapter {
   readonly #onActivatePoint: MapPointActivateHandler;
 
   constructor(
+    options: MapAdapterOptions = {},
     loadSdk: (key: string) => Promise<AMapSdk> = loadAMapSdk,
-    onActivatePoint: MapPointActivateHandler = () => undefined,
   ) {
     this.#loadSdk = loadSdk;
-    this.#onActivatePoint = onActivatePoint;
+    this.#onActivatePoint = options.onPointActivate ?? (() => undefined);
   }
 
   async mount(container: HTMLElement, key: string): Promise<void> {
@@ -30,9 +31,15 @@ export class AMapAdapter implements MapAdapter {
   setPoints(groups: readonly MapRenderGroup[]): void {
     this.#map?.setMarkers(groups);
   }
-  focusPoint(position: readonly [number, number]): void { this.#map?.focusPoint(position); }
-  fitView(): void { this.#map?.fitView(); }
-  clear(): void { this.#map?.clear(); }
+  focusPoint(position: readonly [number, number]): void {
+    this.#map?.focusPoint(position);
+  }
+  fitView(): void {
+    this.#map?.fitView();
+  }
+  clear(): void {
+    this.#map?.clear();
+  }
   destroy(): void {
     this.#mountVersion += 1;
     this.#map?.destroy();
