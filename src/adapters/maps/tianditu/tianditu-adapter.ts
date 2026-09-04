@@ -1,14 +1,23 @@
-import type { MapAdapter, MapRenderPoint } from '../map-adapter';
+import type {
+  MapAdapter,
+  MapPointActivateHandler,
+  MapRenderGroup,
+} from '../map-adapter';
 import { loadTiandituSdk, type TiandituMapSdk } from './tianditu-loader';
-import { TiandituMap, type TiandituMarkerData } from './tianditu-map';
+import { TiandituMap } from './tianditu-map';
 
 export class TiandituAdapter implements MapAdapter {
   #map: TiandituMap | null = null;
   #mountVersion = 0;
   readonly #loadSdk: (token: string) => Promise<TiandituMapSdk>;
+  readonly #onActivatePoint: MapPointActivateHandler;
 
-  constructor(loadSdk: (token: string) => Promise<TiandituMapSdk> = loadTiandituSdk) {
+  constructor(
+    loadSdk: (token: string) => Promise<TiandituMapSdk> = loadTiandituSdk,
+    onActivatePoint: MapPointActivateHandler = () => undefined,
+  ) {
     this.#loadSdk = loadSdk;
+    this.#onActivatePoint = onActivatePoint;
   }
 
   async mount(container: HTMLElement, token: string): Promise<void> {
@@ -16,11 +25,12 @@ export class TiandituAdapter implements MapAdapter {
     const mountVersion = this.#mountVersion;
     const sdk = await this.#loadSdk(token);
     if (mountVersion !== this.#mountVersion) return;
-    this.#map = new TiandituMap(container, sdk);
+    this.#map = new TiandituMap(container, sdk, this.#onActivatePoint);
   }
-  setPoints(points: readonly MapRenderPoint[]): void {
-    this.#map?.setMarkers(points as readonly TiandituMarkerData[]);
+  setPoints(groups: readonly MapRenderGroup[]): void {
+    this.#map?.setMarkers(groups);
   }
+  focusPoint(position: readonly [number, number]): void { this.#map?.focusPoint(position); }
   fitView(): void { this.#map?.fitView(); }
   clear(): void { this.#map?.clear(); }
   destroy(): void {

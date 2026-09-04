@@ -107,6 +107,50 @@ describe('visible page prototypes', () => {
 
   it('manages candidate selection, workspace membership, and marker visibility independently', async () => {
     const user = userEvent.setup();
+    const markerInstances: Array<{
+      handlers: Map<string, () => void>;
+      options: { title: string };
+      trigger: (event: string) => void;
+    }> = [];
+    const infoWindowContents: HTMLElement[] = [];
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    class FakeMap {
+      add = vi.fn();
+      remove = vi.fn();
+      setCenter = vi.fn();
+      setFitView = vi.fn();
+      destroy = vi.fn();
+    }
+    class FakeMarker {
+      readonly handlers = new Map<string, () => void>();
+      constructor(readonly options: { title: string; position: readonly [number, number] }) {
+        markerInstances.push(this);
+      }
+      on(event: string, handler: () => void) { this.handlers.set(event, handler); }
+      off(event: string) { this.handlers.delete(event); }
+      getPosition() { return this.options.position; }
+      trigger(event: string) { this.handlers.get(event)?.(); }
+    }
+    class FakeInfoWindow {
+      constructor(readonly options: { content: HTMLElement }) {
+        infoWindowContents.push(options.content);
+      }
+      open = vi.fn();
+      close = vi.fn();
+    }
+    window.AMap = {
+      Map: FakeMap,
+      Marker: FakeMarker,
+      InfoWindow: FakeInfoWindow,
+    };
     const timestamp = '2026-08-30T08:00:00.000Z' as IsoDateTime;
     const points: Point[] = Array.from({ length: 51 }, (_, index) => ({
       id: `map-point-${index + 1}` as PointId,
@@ -188,8 +232,9 @@ describe('visible page prototypes', () => {
       }),
     );
     const deleteSpy = vi.spyOn(pointService, 'deletePoint');
-    const mountSpy = vi.spyOn(AMapAdapter.prototype, 'mount').mockResolvedValue();
-    const setPointsSpy = vi.spyOn(AMapAdapter.prototype, 'setPoints').mockImplementation(() => {});
+    const mountSpy = vi.spyOn(AMapAdapter.prototype, 'mount');
+    const setPointsSpy = vi.spyOn(AMapAdapter.prototype, 'setPoints');
+    const focusPointSpy = vi.spyOn(AMapAdapter.prototype, 'focusPoint');
     localStorage.setItem('coordinate-toolkit.amap-key', 'test-key');
 
     renderRoute('/map?platform=amap');
@@ -259,16 +304,73 @@ describe('visible page prototypes', () => {
     await user.click(screen.getByRole('checkbox', { name: '显示 设备 1' }));
     expect(await screen.findByText('已显示 2')).toBeVisible();
     await waitFor(() => expect(setPointsSpy.mock.lastCall?.[0]).toHaveLength(2));
-    expect(screen.getByText('点位 3')).toBeVisible();
-    await user.click(screen.getByRole('checkbox', { name: '显示 设备 1' }));
+    expect(focusPointSpy).not.toHaveBeenCalled();
+    await user.click(screen.getByText('设备 1'));
     expect(await screen.findByText('已显示 3')).toBeVisible();
+    expect(screen.getByText('设备 1').closest('.unified-point-list__item')).toHaveClass(
+      'is-active',
+    );
+    await waitFor(() => expect(focusPointSpy).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('点位 3')).toBeVisible();
     await waitFor(() => expect(setPointsSpy.mock.lastCall?.[0]).toHaveLength(3));
 
+    const point51Marker = [...markerInstances].reverse().find(
+      (marker) => marker.options.title === '设备 51' && marker.handlers.has('mouseover'),
+    );
+    point51Marker?.trigger('mouseover');
+    const point51Hover = infoWindowContents.at(-1);
+    expect(point51Hover).toHaveTextContent('设备 51');
+    (point51Hover?.querySelector('button') as HTMLButtonElement).click();
+    await waitFor(() =>
+      expect(screen.getByText('设备 51').closest('.unified-point-list__item')).toHaveClass(
+        'is-active',
+      ),
+    );
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(focusPointSpy).toHaveBeenCalledTimes(1);
+
+    const pointSearch = screen.getByRole('searchbox', { name: '搜索点位' });
+    await user.type(pointSearch, '设备 1');
+    const scrollCountBeforeHiddenSelection = scrollIntoView.mock.calls.length;
+    const point21Marker = [...markerInstances]
+      .reverse()
+      .find((marker) => marker.options.title === '设备 21' && marker.handlers.has('mouseover'));
+    point21Marker?.trigger('mouseover');
+    const point21Hover = infoWindowContents.at(-1);
+    (point21Hover?.querySelector('button') as HTMLButtonElement).click();
+    expect(pointSearch).toHaveValue('设备 1');
+    expect(screen.queryByText('设备 21')).not.toBeInTheDocument();
+    expect(scrollIntoView).toHaveBeenCalledTimes(scrollCountBeforeHiddenSelection);
+    await user.clear(pointSearch);
+    await waitFor(() =>
+      expect(screen.getByText('设备 21').closest('.unified-point-list__item')).toHaveClass(
+        'is-active',
+      ),
+    );
+
     await user.click(screen.getByRole('button', { name: '从当前地图移除 设备 21' }));
+    expect(focusPointSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('设备 21')).not.toBeInTheDocument();
     expect(screen.getByText('点位 2')).toBeVisible();
     expect(screen.getByText('已显示 2')).toBeVisible();
     expect(deleteSpy).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(setPointsSpy.mock.lastCall?.[0].every((group) => group.activePointId === null)).toBe(
+        true,
+      ),
+    );
+
+    const remainingPoint51Marker = [...markerInstances]
+      .reverse()
+      .find((marker) => marker.options.title === '设备 51' && marker.handlers.has('mouseover'));
+    remainingPoint51Marker?.trigger('mouseover');
+    const remainingPoint51Hover = infoWindowContents.at(-1);
+    (remainingPoint51Hover?.querySelector('button') as HTMLButtonElement).click();
+    await waitFor(() =>
+      expect(screen.getByText('设备 51').closest('.unified-point-list__item')).toHaveClass(
+        'is-active',
+      ),
+    );
 
     const platformSelect = screen.getByRole('combobox', { name: '地图平台切换' });
     await user.click(platformSelect);
@@ -278,6 +380,9 @@ describe('visible page prototypes', () => {
     await user.click(tiandituOption!);
     expect(screen.getByText('点位 2')).toBeVisible();
     expect(screen.getByText('已显示 2')).toBeVisible();
+    expect(screen.getByText('设备 51').closest('.unified-point-list__item')).toHaveClass(
+      'is-active',
+    );
 
     await user.click(screen.getByRole('button', { name: '添加点位' }));
     const reopenedPicker = await screen.findByRole('dialog');
@@ -290,6 +395,9 @@ describe('visible page prototypes', () => {
     expect(await screen.findByText('已显示 0')).toBeVisible();
     expect(screen.getByText('点位 2')).toBeVisible();
     expect(screen.getByRole('checkbox', { name: '显示 设备 1' })).not.toBeChecked();
+    expect(screen.getByText('设备 51').closest('.unified-point-list__item')).toHaveClass(
+      'is-active',
+    );
     await user.click(screen.getByRole('button', { name: '全部显示' }));
     expect(await screen.findByText('已显示 2')).toBeVisible();
 
@@ -314,5 +422,12 @@ describe('visible page prototypes', () => {
     deleteSpy.mockRestore();
     mountSpy.mockRestore();
     setPointsSpy.mockRestore();
+    focusPointSpy.mockRestore();
+    delete window.AMap;
+    if (originalScrollIntoView) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+    }
   });
 });

@@ -6,6 +6,7 @@ import {
   TiandituMap,
   type TiandituMarkerData,
 } from '@/adapters/maps/tianditu/tianditu-map';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 import type { Point, PointId, Result } from '@/domain';
 import { pointService, type PointService } from '@/features/points';
 
@@ -130,7 +131,8 @@ export class TiandituMapService {
         else missingCoordinatePoints.push(point);
       });
 
-    this.#map.setMarkers(markers);
+    this.#map.setMarkers(groupMapRenderPoints(markers, null));
+    this.#map.fitView();
     return { status: 'success', value: { markers, missingCoordinatePoints } };
   }
 

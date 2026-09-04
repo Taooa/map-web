@@ -65,7 +65,7 @@ describe('BaiduMapService', () => {
     await repository.create(createWgs84Point(false));
 
     const setMarkers = vi.fn<(markers: readonly BaiduMarkerData[]) => void>();
-    const fakeMap = { setMarkers, destroy: vi.fn() } as unknown as BaiduMap;
+    const fakeMap = { setMarkers, fitView: vi.fn(), destroy: vi.fn() } as unknown as BaiduMap;
     const service = new BaiduMapService(points, {
       loadSdk: () => Promise.resolve({} as BaiduMapSdk),
       createMap: () => fakeMap,

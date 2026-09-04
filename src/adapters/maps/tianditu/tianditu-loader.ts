@@ -2,12 +2,14 @@ export type TiandituLngLatInstance = object;
 export type TiandituInfoWindowInstance = object;
 
 export interface TiandituMarkerInstance {
-  addEventListener(event: 'click', handler: () => void): void;
-  removeEventListener?(event: 'click', handler: () => void): void;
+  addEventListener(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
+  removeEventListener?(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
 }
 
 export interface TiandituMapInstance {
   centerAndZoom(position: TiandituLngLatInstance, zoom: number): void;
+  panTo?(position: TiandituLngLatInstance): void;
+  getZoom(): number;
   enableScrollWheelZoom(): void;
   enableDoubleClickZoom(): void;
   addOverLay(marker: TiandituMarkerInstance): void;
@@ -17,10 +19,21 @@ export interface TiandituMapInstance {
 }
 
 export interface TiandituMapSdk {
+  readonly Point: new (x: number, y: number) => object;
+  readonly Icon: new (options: {
+    readonly iconUrl: string;
+    readonly iconSize: object;
+    readonly iconAnchor: object;
+  }) => object;
   readonly Map: new (container: HTMLElement) => TiandituMapInstance;
   readonly LngLat: new (lng: number, lat: number) => TiandituLngLatInstance;
-  readonly Marker: new (position: TiandituLngLatInstance) => TiandituMarkerInstance;
-  readonly InfoWindow: new (options: { readonly content: string }) => TiandituInfoWindowInstance;
+  readonly Marker: new (
+    position: TiandituLngLatInstance,
+    options?: { readonly icon: object },
+  ) => TiandituMarkerInstance;
+  readonly InfoWindow: new (options: {
+    readonly content: string | HTMLElement;
+  }) => TiandituInfoWindowInstance;
 }
 
 declare global {

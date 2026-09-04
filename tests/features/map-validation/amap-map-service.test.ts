@@ -67,6 +67,7 @@ describe('AMapMapService', () => {
     const setMarkers = vi.fn<(markers: readonly AMapMarkerData[]) => void>();
     const fakeMap = {
       setMarkers,
+      fitView: vi.fn(),
       destroy: vi.fn(),
     } as unknown as AMapMap;
     const service = new AMapMapService(points, {

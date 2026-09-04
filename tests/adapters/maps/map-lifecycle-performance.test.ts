@@ -24,6 +24,7 @@ import type {
 } from '@/adapters/maps/tianditu/tianditu-loader';
 import { TiandituMap, type TiandituMarkerData } from '@/adapters/maps/tianditu/tianditu-map';
 import { TiandituAdapter } from '@/adapters/maps/tianditu/tianditu-adapter';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 
 interface Counters {
   activeMaps: number;
@@ -83,6 +84,7 @@ function createAMapSdk(state: Counters): AMapSdk {
     }
     add(overlays: readonly AMapMarkerInstance[]): void { state.overlays += overlays.length; }
     remove(overlays: readonly AMapMarkerInstance[]): void { state.overlays -= overlays.length; }
+    setCenter(): void {}
     setFitView(): void {}
     destroy(): void {
       this.#root.remove();
@@ -105,6 +107,8 @@ function createAMapSdk(state: Counters): AMapSdk {
 
 function createBaiduSdk(state: Counters): BaiduMapSdk {
   class Point {}
+  class Size {}
+  class Icon {}
   class Marker implements BaiduMarkerInstance {
     readonly #point: BaiduPointInstance;
     constructor(point: BaiduPointInstance) { this.#point = point; }
@@ -122,6 +126,7 @@ function createBaiduSdk(state: Counters): BaiduMapSdk {
       state.activeMaps += 1;
     }
     centerAndZoom(): void {}
+    panTo(): void {}
     enableScrollWheelZoom(): void {}
     addOverlay(): void { state.overlays += 1; }
     removeOverlay(): void { state.overlays -= 1; }
@@ -130,11 +135,13 @@ function createBaiduSdk(state: Counters): BaiduMapSdk {
     setViewport(): void {}
     getContainer(): HTMLElement { return this.#container; }
   }
-  return { Map: MapInstance, Point, Marker, InfoWindow };
+  return { Map: MapInstance, Point, Size, Icon, Marker, InfoWindow };
 }
 
 function createTiandituSdk(state: Counters): TiandituMapSdk {
   class LngLat {}
+  class Point {}
+  class Icon {}
   class Marker implements TiandituMarkerInstance {
     addEventListener(): void { state.listeners += 1; }
     removeEventListener(): void { state.listeners -= 1; }
@@ -146,6 +153,7 @@ function createTiandituSdk(state: Counters): TiandituMapSdk {
       state.activeMaps += 1;
     }
     centerAndZoom(): void {}
+    getZoom(): number { return 11; }
     enableScrollWheelZoom(): void {}
     enableDoubleClickZoom(): void {}
     addOverLay(): void { state.overlays += 1; }
@@ -153,7 +161,7 @@ function createTiandituSdk(state: Counters): TiandituMapSdk {
     openInfoWindow(): void {}
     closeInfoWindow(): void {}
   }
-  return { Map: MapInstance, LngLat, Marker, InfoWindow };
+  return { Map: MapInstance, LngLat, Point, Icon, Marker, InfoWindow };
 }
 
 describe.each([100, 1000, 5000])('地图覆盖物生命周期：%i 个点', (size) => {
@@ -161,13 +169,13 @@ describe.each([100, 1000, 5000])('地图覆盖物生命周期：%i 个点', (siz
     const state = counters();
     const container = document.createElement('div');
     const map = new AMapMap(container, createAMapSdk(state));
-    map.setMarkers(amapData(size));
-    map.setMarkers(amapData(size));
-    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size });
+    map.setMarkers(groupMapRenderPoints(amapData(size), null));
+    map.setMarkers(groupMapRenderPoints(amapData(size), null));
+    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size * 3 });
     map.clear();
     expect(state).toMatchObject({ overlays: 0, listeners: 0 });
     expect(() => map.fitView()).not.toThrow();
-    map.setMarkers(amapData(1));
+    map.setMarkers(groupMapRenderPoints(amapData(1), null));
     expect(() => map.fitView()).not.toThrow();
     map.destroy();
     expect(state).toEqual({ activeMaps: 0, overlays: 0, listeners: 0 });
@@ -178,13 +186,13 @@ describe.each([100, 1000, 5000])('地图覆盖物生命周期：%i 个点', (siz
     const state = counters();
     const container = document.createElement('div');
     const map = new BaiduMap(container, createBaiduSdk(state));
-    map.setMarkers(baiduData(size));
-    map.setMarkers(baiduData(size));
-    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size });
+    map.setMarkers(groupMapRenderPoints(baiduData(size), null));
+    map.setMarkers(groupMapRenderPoints(baiduData(size), null));
+    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size * 3 });
     map.clear();
     expect(state).toMatchObject({ overlays: 0, listeners: 0 });
     expect(() => map.fitView()).not.toThrow();
-    map.setMarkers(baiduData(1));
+    map.setMarkers(groupMapRenderPoints(baiduData(1), null));
     expect(() => map.fitView()).not.toThrow();
     map.destroy();
     expect(state.overlays).toBe(0);
@@ -196,13 +204,13 @@ describe.each([100, 1000, 5000])('地图覆盖物生命周期：%i 个点', (siz
     const state = counters();
     const container = document.createElement('div');
     const map = new TiandituMap(container, createTiandituSdk(state));
-    map.setMarkers(tiandituData(size));
-    map.setMarkers(tiandituData(size));
-    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size });
+    map.setMarkers(groupMapRenderPoints(tiandituData(size), null));
+    map.setMarkers(groupMapRenderPoints(tiandituData(size), null));
+    expect(state).toMatchObject({ activeMaps: 1, overlays: size, listeners: size * 3 });
     map.clear();
     expect(state).toMatchObject({ overlays: 0, listeners: 0 });
     expect(() => map.fitView()).not.toThrow();
-    map.setMarkers(tiandituData(1));
+    map.setMarkers(groupMapRenderPoints(tiandituData(1), null));
     expect(() => map.fitView()).not.toThrow();
     map.destroy();
     expect(state.overlays).toBe(0);
@@ -218,7 +226,7 @@ describe('连续创建和销毁地图实例', () => {
     const sdk = createAMapSdk(state);
     for (let index = 0; index < 30; index += 1) {
       const map = new AMapMap(container, sdk);
-      map.setMarkers(amapData(100));
+      map.setMarkers(groupMapRenderPoints(amapData(100), null));
       map.destroy();
     }
     expect(state).toEqual({ activeMaps: 0, overlays: 0, listeners: 0 });

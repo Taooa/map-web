@@ -2274,32 +2274,41 @@ html[data-theme='dark'] .radix-alert-dialog {
 }
 
 .unified-point-list__item {
+  position: relative;
   display: flex;
   padding: 9px 10px;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .unified-point-list__item:hover {
   background: var(--color-surface-subtle);
 }
 
-.unified-point-list__item .ant-checkbox-wrapper {
-  min-width: 0;
-  flex: 1;
+.unified-point-list__item.is-active {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
-.unified-point-list__item .ant-checkbox-label {
-  min-width: 0;
-  flex: 1;
+.unified-point-list__item.is-active:hover {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+}
+
+.unified-point-list__item .ant-checkbox-wrapper {
+  flex: none;
 }
 
 .unified-point-list__content {
   display: grid;
   min-width: 0;
   gap: 2px;
+  flex: 1;
 }
 
 .unified-point-list__content strong,
@@ -3289,6 +3298,66 @@ html[data-theme='dark'] .radix-alert-dialog {
 .tianditu-info-window code {
   color: #334b5b;
   font-size: 10px;
+}
+
+.map-marker-hover {
+  min-width: 150px;
+  max-width: 260px;
+  padding: 7px;
+  color: #132635;
+  font-family: Inter, 'Microsoft YaHei', sans-serif;
+  font-size: 11px;
+}
+
+.map-marker-hover__title {
+  display: block;
+  padding: 4px 7px 7px;
+  border-bottom: 1px solid #e6edf2;
+  font-size: 12px;
+}
+
+.map-marker-hover__list {
+  max-height: 224px;
+  overflow-y: auto;
+}
+
+.map-marker-hover__item {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-marker-hover__item:hover {
+  background: #f3f7fa;
+}
+
+.map-marker-hover__item.is-active {
+  padding-left: 12px;
+  background: #eaf3ff;
+  color: #0958d9;
+  font-weight: 700;
+}
+
+.map-marker-hover__item.is-active::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: #1677ff;
+  content: '';
 }
 
 /* Existing placeholder / 404 */

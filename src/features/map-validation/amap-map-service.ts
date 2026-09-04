@@ -1,5 +1,6 @@
 import { AMapMap, type AMapMarkerData } from '@/adapters/maps/amap/amap-map';
 import { loadAMapSdk, type AMapSdk } from '@/adapters/maps/amap/amap-loader';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 import type { Point, PointId, Result } from '@/domain';
 import { pointService, type PointService } from '@/features/points';
 
@@ -123,7 +124,8 @@ export class AMapMapService {
       }
     }
 
-    this.#map.setMarkers(markers);
+    this.#map.setMarkers(groupMapRenderPoints(markers, null));
+    this.#map.fitView();
     return {
       status: 'success',
       value: { markers, missingCoordinatePoints },

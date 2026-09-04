@@ -1,13 +1,14 @@
 export interface AMapInstance {
   add(overlays: readonly AMapMarkerInstance[]): void;
   remove(overlays: readonly AMapMarkerInstance[]): void;
+  setCenter(position: readonly [number, number]): void;
   setFitView(overlays?: readonly AMapMarkerInstance[]): void;
   destroy(): void;
 }
 
 export interface AMapMarkerInstance {
-  on(event: 'click', handler: () => void): void;
-  off?(event: 'click', handler: () => void): void;
+  on(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
+  off?(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
   getPosition(): unknown;
 }
 
@@ -22,6 +23,8 @@ export interface AMapSdk {
     options: { zoom: number; center: readonly [number, number] },
   ) => AMapInstance;
   readonly Marker: new (options: {
+    anchor: 'bottom-center';
+    icon: string;
     position: readonly [number, number];
     title: string;
   }) => AMapMarkerInstance;

@@ -1,4 +1,5 @@
 import { BaiduMap, type BaiduMarkerData } from '@/adapters/maps/baidu/baidu-map';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 import {
   loadBaiduMapSdk,
   type BaiduMapSdk,
@@ -125,7 +126,8 @@ export class BaiduMapService {
       else missingCoordinatePoints.push(point);
     }
 
-    this.#map.setMarkers(markers);
+    this.#map.setMarkers(groupMapRenderPoints(markers, null));
+    this.#map.fitView();
     return {
       status: 'success',
       value: { markers, missingCoordinatePoints },

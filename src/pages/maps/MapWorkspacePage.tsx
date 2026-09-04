@@ -27,7 +27,12 @@ import { AMapAdapter } from '@/adapters/maps/amap/amap-adapter';
 import { AMapToolbar } from '@/adapters/maps/amap/AMapToolbar';
 import { BaiduAdapter } from '@/adapters/maps/baidu/baidu-adapter';
 import { BaiduToolbar } from '@/adapters/maps/baidu/BaiduToolbar';
-import type { MapAdapter, MapRenderPoint } from '@/adapters/maps/map-adapter';
+import type {
+  MapAdapter,
+  MapPointActivateHandler,
+  MapRenderPoint,
+} from '@/adapters/maps/map-adapter';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 import { TiandituAdapter } from '@/adapters/maps/tianditu/tianditu-adapter';
 import { TiandituToolbar } from '@/adapters/maps/tianditu/TiandituToolbar';
 import type { CoordinateSystemId, Point, PointId } from '@/domain';
@@ -77,10 +82,13 @@ function isPlatform(value: string | null): value is Platform {
   return value === 'amap' || value === 'baidu' || value === 'tianditu';
 }
 
-function createAdapter(platform: Platform): MapAdapter {
-  if (platform === 'amap') return new AMapAdapter();
-  if (platform === 'baidu') return new BaiduAdapter();
-  return new TiandituAdapter();
+function createAdapter(
+  platform: Platform,
+  onActivatePoint: MapPointActivateHandler,
+): MapAdapter {
+  if (platform === 'amap') return new AMapAdapter(undefined, onActivatePoint);
+  if (platform === 'baidu') return new BaiduAdapter(undefined, onActivatePoint);
+  return new TiandituAdapter(undefined, onActivatePoint);
 }
 
 function toRenderPoint(platform: Platform, point: Point): MapRenderPoint | null {
@@ -148,9 +156,15 @@ export function MapWorkspacePage() {
   const config = platforms[platform];
   const containerRef = useRef<HTMLDivElement>(null);
   const pointListRef = useRef<HTMLDivElement>(null);
+  const pointRowRefs = useRef(new Map<PointId, HTMLDivElement>());
   const adapterRef = useRef<MapAdapter | null>(null);
+  const activatePointFromMapRef = useRef<MapPointActivateHandler>(() => undefined);
+  const pendingScrollPointIdRef = useRef<PointId | null>(null);
+  const pendingFocusPointIdRef = useRef<PointId | null>(null);
+  const pendingFitViewRef = useRef(false);
   const [workspacePointIds, setWorkspacePointIds] = useState<ReadonlySet<PointId>>(new Set());
   const [visiblePointIds, setVisiblePointIds] = useState<ReadonlySet<PointId>>(new Set());
+  const [activePointId, setActivePointId] = useState<PointId | null>(null);
   const [pointCache, setPointCache] = useState<ReadonlyMap<PointId, Point>>(new Map());
   const [query, setQuery] = useState('');
   const [visiblePointCount, setVisiblePointCount] = useState(MAP_VISIBLE_POINT_BATCH_SIZE);
@@ -170,7 +184,7 @@ export function MapWorkspacePage() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !credential) return;
-    const adapter = createAdapter(platform);
+    const adapter = createAdapter(platform, (pointId) => activatePointFromMapRef.current(pointId));
     adapterRef.current?.destroy();
     adapterRef.current = adapter;
     let active = true;
@@ -181,6 +195,7 @@ export function MapWorkspacePage() {
           adapter.destroy();
           return;
         }
+        pendingFitViewRef.current = true;
         setStatus('ready');
       },
       (error: unknown) => {
@@ -214,6 +229,24 @@ export function MapWorkspacePage() {
   const renderedWorkspacePoints = filteredWorkspacePoints.slice(0, visiblePointCount);
   const hasMorePoints = renderedWorkspacePoints.length < filteredWorkspacePoints.length;
 
+  useEffect(() => {
+    activatePointFromMapRef.current = (rawPointId) => {
+      const pointId = rawPointId as PointId;
+      if (!workspacePointIds.has(pointId)) return;
+      setActivePointId(pointId);
+      const pointIndex = filteredWorkspacePoints.findIndex((point) => point.id === pointId);
+      if (pointIndex < 0) return;
+      pendingScrollPointIdRef.current = pointId;
+      setVisiblePointCount((current) =>
+        Math.max(
+          current,
+          Math.ceil((pointIndex + 1) / MAP_VISIBLE_POINT_BATCH_SIZE) *
+            MAP_VISIBLE_POINT_BATCH_SIZE,
+        ),
+      );
+    };
+  }, [filteredWorkspacePoints, workspacePointIds]);
+
   const display = useMemo(() => {
     const markers: MapRenderPoint[] = [];
     const missing: Point[] = [];
@@ -231,10 +264,36 @@ export function MapWorkspacePage() {
     ? `${display.missing.map((point) => point.name).join('、')} 需要先转换为 ${config.coordinate}。`
     : null;
 
+  const markerGroups = useMemo(
+    () => groupMapRenderPoints(display.markers, activePointId),
+    [activePointId, display.markers],
+  );
+
   useEffect(() => {
     if (status !== 'ready') return;
-    adapterRef.current?.setPoints(display.markers);
-  }, [display.markers, status]);
+    const adapter = adapterRef.current;
+    adapter?.setPoints(markerGroups);
+    const pendingFocusPointId = pendingFocusPointIdRef.current;
+    if (pendingFocusPointId) {
+      const point = pointCache.get(pendingFocusPointId);
+      const marker = point ? toRenderPoint(platform, point) : null;
+      if (marker) adapter?.focusPoint(marker.position);
+      pendingFocusPointIdRef.current = null;
+      pendingFitViewRef.current = false;
+    } else if (pendingFitViewRef.current) {
+      adapter?.fitView();
+      pendingFitViewRef.current = false;
+    }
+  }, [markerGroups, platform, pointCache, status]);
+
+  useEffect(() => {
+    const pointId = pendingScrollPointIdRef.current;
+    if (!pointId) return;
+    const row = pointRowRefs.current.get(pointId);
+    if (!row) return;
+    row.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    pendingScrollPointIdRef.current = null;
+  }, [activePointId, renderedWorkspacePoints]);
 
   function switchPlatform(next: Platform) {
     if (next !== platform) {
@@ -253,6 +312,7 @@ export function MapWorkspacePage() {
   async function addWorkspacePoints(pointIds: readonly PointId[]) {
     const result = await loadPointsByIds(pointIds, pointCache);
     const addedIds = result.points.map((point) => point.id);
+    pendingFitViewRef.current = true;
     setPointCache((current) => {
       const next = new Map(current);
       result.points.forEach((point) => next.set(point.id, point));
@@ -268,6 +328,7 @@ export function MapWorkspacePage() {
   }
 
   function togglePointVisibility(pointId: PointId) {
+    pendingFitViewRef.current = true;
     setVisiblePointIds((current) => {
       const next = new Set(current);
       if (next.has(pointId)) next.delete(pointId);
@@ -277,6 +338,8 @@ export function MapWorkspacePage() {
   }
 
   function removeWorkspacePoint(pointId: PointId) {
+    pendingFitViewRef.current = true;
+    setActivePointId((current) => (current === pointId ? null : current));
     setWorkspacePointIds((current) => {
       const next = new Set(current);
       next.delete(pointId);
@@ -290,13 +353,23 @@ export function MapWorkspacePage() {
   }
 
   function showAllWorkspacePoints() {
+    pendingFitViewRef.current = true;
     setVisiblePointIds(new Set(workspacePointIds));
+  }
+
+  function activateWorkspacePoint(point: Point) {
+    pendingFocusPointIdRef.current = point.id;
+    setActivePointId(point.id);
+    setVisiblePointIds((current) =>
+      current.has(point.id) ? current : new Set([...current, point.id]),
+    );
   }
 
   function clearWorkspace() {
     adapterRef.current?.clear();
     setWorkspacePointIds(new Set());
     setVisiblePointIds(new Set());
+    setActivePointId(null);
     setPointCache(new Map());
     setMessage(null);
   }
@@ -379,7 +452,7 @@ export function MapWorkspacePage() {
         <header className="unified-map-panel__header">
           <div>
             <strong>点位 {workspacePointIds.size}</strong>
-            <small>已显示 {display.markers.length}</small>
+            <small>已显示 {visiblePointIds.size}</small>
           </div>
           <div className="unified-map-panel__header-actions">
             <Tooltip title="收起点位面板">
@@ -450,25 +523,36 @@ export function MapWorkspacePage() {
             ref={pointListRef}
           >
             {renderedWorkspacePoints.map((point) => (
-              <div className="unified-point-list__item" key={point.id}>
+              <div
+                className={`unified-point-list__item${activePointId === point.id ? ' is-active' : ''}`}
+                key={point.id}
+                onClick={() => activateWorkspacePoint(point)}
+                ref={(element) => {
+                  if (element) pointRowRefs.current.set(point.id, element);
+                  else pointRowRefs.current.delete(point.id);
+                }}
+              >
                 <Checkbox
                   aria-label={`显示 ${point.name}`}
                   checked={visiblePointIds.has(point.id)}
+                  onClick={(event) => event.stopPropagation()}
                   onChange={() => togglePointVisibility(point.id)}
-                >
-                  <span className="unified-point-list__content">
-                    <strong>{point.name}</strong>
-                    <small>
-                      {pointSourceName(point)} · {originalCoordinateText(point)}
-                    </small>
-                  </span>
-                </Checkbox>
+                />
+                <span className="unified-point-list__content">
+                  <strong>{point.name}</strong>
+                  <small>
+                    {pointSourceName(point)} · {originalCoordinateText(point)}
+                  </small>
+                </span>
                 <Tooltip title="从当前地图移除">
                   <Button
                     aria-label={`从当前地图移除 ${point.name}`}
                     className="unified-point-list__remove"
                     icon={<CloseOutlined />}
-                    onClick={() => removeWorkspacePoint(point.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removeWorkspacePoint(point.id);
+                    }}
                     shape="circle"
                     size="small"
                     type="text"

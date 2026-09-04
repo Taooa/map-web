@@ -107,7 +107,7 @@ describe('TiandituMapService', () => {
     await repository.create(createPoint('valid', wgs84));
     await repository.create(createPoint('missing', gcj02));
     const setMarkers = vi.fn();
-    const map = { setMarkers, destroy: vi.fn() } as unknown as TiandituMap;
+    const map = { setMarkers, fitView: vi.fn(), destroy: vi.fn() } as unknown as TiandituMap;
     const service = new TiandituMapService(points, {
       loadSdk: () => Promise.resolve({} as TiandituMapSdk),
       createMap: () => map,
@@ -124,7 +124,10 @@ describe('TiandituMapService', () => {
       },
     });
     expect(setMarkers).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'valid', position: [121.4737, 31.2304] }),
+      expect.objectContaining({
+        position: [121.4737, 31.2304],
+        points: [expect.objectContaining({ id: 'valid', position: [121.4737, 31.2304] })],
+      }),
     ]);
   });
 });

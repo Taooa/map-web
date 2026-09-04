@@ -2,8 +2,8 @@ export type BaiduPointInstance = object;
 
 export interface BaiduMarkerInstance {
   setTitle(title: string): void;
-  addEventListener(event: 'click', handler: () => void): void;
-  removeEventListener?(event: 'click', handler: () => void): void;
+  addEventListener(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
+  removeEventListener?(event: 'click' | 'mouseover' | 'mouseout', handler: () => void): void;
   getPosition(): BaiduPointInstance;
 }
 
@@ -11,6 +11,7 @@ export type BaiduInfoWindowInstance = object;
 
 export interface BaiduMapInstance {
   centerAndZoom(point: BaiduPointInstance, zoom: number): void;
+  panTo(point: BaiduPointInstance): void;
   enableScrollWheelZoom(): void;
   addOverlay(marker: BaiduMarkerInstance): void;
   removeOverlay(marker: BaiduMarkerInstance): void;
@@ -21,10 +22,19 @@ export interface BaiduMapInstance {
 }
 
 export interface BaiduMapSdk {
+  readonly Size: new (width: number, height: number) => object;
+  readonly Icon: new (
+    imageUrl: string,
+    size: object,
+    options: { anchor: object; imageSize: object },
+  ) => object;
   readonly Map: new (container: HTMLElement) => BaiduMapInstance;
   readonly Point: new (lng: number, lat: number) => BaiduPointInstance;
-  readonly Marker: new (point: BaiduPointInstance) => BaiduMarkerInstance;
-  readonly InfoWindow: new (content: string) => BaiduInfoWindowInstance;
+  readonly Marker: new (
+    point: BaiduPointInstance,
+    options?: { icon: object },
+  ) => BaiduMarkerInstance;
+  readonly InfoWindow: new (content: string | HTMLElement) => BaiduInfoWindowInstance;
 }
 
 declare global {

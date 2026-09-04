@@ -6,6 +6,7 @@ import type {
   TiandituMapSdk,
   TiandituMarkerInstance,
 } from '@/adapters/maps/tianditu/tianditu-loader';
+import { groupMapRenderPoints } from '@/adapters/maps/marker-groups';
 
 describe('TiandituMap', () => {
   it('creates markers, opens an InfoWindow, replaces markers and cleans up', () => {
@@ -21,6 +22,8 @@ describe('TiandituMap', () => {
         readonly lat: number,
       ) {}
     }
+    class FakePoint {}
+    class FakeIcon {}
     class FakeMarker {
       constructor(readonly position: TiandituLngLatInstance) {}
       addEventListener(_event: 'click', handler: () => void) {
@@ -28,10 +31,11 @@ describe('TiandituMap', () => {
       }
     }
     class FakeInfoWindow {
-      constructor(readonly options: { readonly content: string }) {}
+      constructor(readonly options: { readonly content: string | HTMLElement }) {}
     }
     class FakeMap {
       centerAndZoom = centerAndZoom;
+      getZoom = vi.fn(() => 11);
       enableScrollWheelZoom = vi.fn();
       enableDoubleClickZoom = vi.fn();
       addOverLay = addOverLay;
@@ -42,6 +46,8 @@ describe('TiandituMap', () => {
     const sdk = {
       Map: FakeMap,
       LngLat: FakeLngLat,
+      Point: FakePoint,
+      Icon: FakeIcon,
       Marker: FakeMarker,
       InfoWindow: FakeInfoWindow,
     } as unknown as TiandituMapSdk;
@@ -56,8 +62,9 @@ describe('TiandituMap', () => {
       displaySystem: 'WGS84' as const,
     };
 
-    map.setMarkers([markerData]);
+    map.setMarkers(groupMapRenderPoints([markerData], null));
     expect(addOverLay).toHaveBeenCalledTimes(1);
+    map.fitView();
     expect(centerAndZoom).toHaveBeenLastCalledWith(
       expect.objectContaining({ lng: 121.4737, lat: 31.2304 }),
       15,
@@ -66,13 +73,13 @@ describe('TiandituMap', () => {
     handlers[0]!();
     expect(openInfoWindow).toHaveBeenCalledTimes(1);
     const infoWindow = openInfoWindow.mock.calls[0]![0] as FakeInfoWindow;
-    expect(infoWindow.options.content).toContain('&lt;设备 A&gt;');
-    expect(infoWindow.options.content).toContain('展示坐标系：WGS84');
+    expect((infoWindow.options.content as HTMLElement).textContent).toContain('<设备 A>');
+    expect((infoWindow.options.content as HTMLElement).textContent).toContain('展示坐标系：WGS84');
 
     map.setMarkers([]);
     expect(removeOverLay).toHaveBeenCalledTimes(1);
 
-    map.setMarkers([markerData]);
+    map.setMarkers(groupMapRenderPoints([markerData], null));
     map.destroy();
     expect(removeOverLay).toHaveBeenCalledTimes(2);
     expect(container).toBeEmptyDOMElement();
